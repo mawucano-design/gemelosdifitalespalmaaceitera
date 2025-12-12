@@ -40,7 +40,10 @@ Aplicación web para análisis de fertilidad y recomendaciones NPK en cultivos d
 
 ### Instalación Local
 
-1. **Clonar el repositorio:**
-```bash
-git clone https://github.com/tu-usuario/agriculture-gee-app.git
-cd agriculture-gee-app
+## 🚀 Despliegue en Streamlit Cloud
+
+1. **Sube a GitHub:**
+   ```bash
+   git add .
+   git commit -m "Initial app deployment"
+   git push origin main
