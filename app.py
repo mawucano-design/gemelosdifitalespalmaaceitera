@@ -503,24 +503,37 @@ def clasificar_textura_suelo(arena, limo, arcilla):
         return "NO_DETERMINADA"
 
 def calcular_superficie(gdf):
-    """Calcula superficie en hectáreas"""
+    """Calcula superficie en hectáreas con manejo robusto de CRS"""
     try:
-        if gdf.empty:
+        if gdf.empty or gdf.geometry.isnull().all():
             return 0.0
-        
+            
+        # Verificar si el CRS es geográfico (grados)
         if gdf.crs and gdf.crs.is_geographic:
+            # Convertir a un CRS proyectado para cálculo de área precisa
             try:
-                gdf_proj = gdf.to_crs('EPSG:3116')
+                # Usar UTM adecuado (aquí se usa un CRS común para Colombia)
+                gdf_proj = gdf.to_crs('EPSG:3116')  # MAGNA-SIRGAS / Colombia West zone
                 area_m2 = gdf_proj.geometry.area
             except:
+                # Fallback: conversión aproximada (1 grado ≈ 111km en ecuador)
                 area_m2 = gdf.geometry.area * 111000 * 111000
         else:
+            # Asumir que ya está en metros
             area_m2 = gdf.geometry.area
             
-        return area_m2 / 10000
+        # ***** CORRECIÓN CLAVE AQUÍ *****
+        # Asegurar que devolvemos un solo número float, no una Serie
+        area_ha = (area_m2 / 10000).sum()  # .sum() convierte Serie -> float
+        return float(area_ha)  # float() para seguridad extra
         
     except Exception as e:
-        return 1.0
+        # Fallback simple
+        try:
+            # Asegurar que también aquí devolvemos float
+            return float(gdf.geometry.area.mean() / 10000)
+        except:
+            return 1.0  # Valor por defecto
 
 def dividir_parcela_en_zonas(gdf, n_zonas):
     """Divide la parcela en zonas de manejo"""
