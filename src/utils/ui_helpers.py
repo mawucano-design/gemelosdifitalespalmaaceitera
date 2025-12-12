@@ -59,19 +59,22 @@ def mostrar_resultados_textura():
     textura_dist = gdf_textura['textura_suelo'].value_counts()
     st.bar_chart(textura_dist)
     # Gráfico de composición granulométrica
-    st.subheader("🔺 Composición Granulométrica Promedio")
-    fig, ax = st.pyplot().__class__.gca().figure, st.pyplot().__class__.gca()
-    # Datos para el gráfico de torta
-    composicion = [
-        gdf_textura['arena'].mean(),
-        gdf_textura['limo'].mean(), 
-        gdf_textura['arcilla'].mean()
-    ]
-    labels = ['Arena', 'Limo', 'Arcilla']
-    colors = ['#d8b365', '#f6e8c3', '#01665e']
-    ax.pie(composicion, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
-    ax.set_title('Composición Promedio del Suelo')
-    st.pyplot(fig)
+st.subheader("🔺 Composición Granulométrica Promedio")
+import matplotlib.pyplot as plt
+
+# Datos para el gráfico de torta
+composicion = [
+    gdf_textura['arena'].mean(),
+    gdf_textura['limo'].mean(), 
+    gdf_textura['arcilla'].mean()
+]
+labels = ['Arena', 'Limo', 'Arcilla']
+colors = ['#d8b365', '#f6e8c3', '#01665e']
+
+fig, ax = plt.subplots()
+ax.pie(composicion, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+ax.set_title('Composición Promedio del Suelo')
+st.pyplot(fig)
     # Mapa de texturas
     st.subheader("🗺️ Mapa de Texturas del Suelo")
     mapa_textura = crear_mapa_interactivo(
