@@ -254,7 +254,7 @@ FACTORES_N_MES = {
 
 FACTORES_P_MES = {
     "ENERO": 1.0, "FEBRERO": 1.0, "MARZO": 1.05, "ABRIL": 1.1,
-    "MAYO": 1.15, "JUNIO": 1.1, "JULIO": 1.05, "AGOSTO": 1.0,
+    "MAYO": 1.15, "JUNIO": 1.1, "JULio": 1.05, "AGOSTO": 1.0,
     "SEPTIEMBRE": 1.0, "OCTUBRE": 1.05, "NOVIEMBRE": 1.1, "DICIEMBRE": 1.05
 }
 
@@ -473,7 +473,7 @@ class DigitalTwinBuilder:
             return None
 
 # ============================================================================
-# FUNCIONES AUXILIARES EXISTENTES (CON CORRECCIÓN CRÍTICA)
+# FUNCIONES AUXILIARES EXISTENTES
 # ============================================================================
 def clasificar_textura_suelo(arena, limo, arcilla):
     """Clasifica la textura del suelo según USDA"""
@@ -502,9 +502,6 @@ def clasificar_textura_suelo(arena, limo, arcilla):
     except Exception as e:
         return "NO_DETERMINADA"
 
-# ============================================================================
-# FUNCIÓN CALCULAR_SUPERFICIE COMPLETAMENTE REESCRITA
-# ============================================================================
 def calcular_superficie(geom):
     """Calcula superficie en hectáreas para una geometría individual (Polygon/MultiPolygon)"""
     try:
@@ -626,7 +623,7 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
                 colores = PALETAS_GEE['NITROGENO']
             elif nutriente == "FÓSFORO":
                 vmin, vmax = 0, 120
-                colores = PALETAS_GEE['FOSFORO']
+                colores = PALETAS_GEE['FÓSFORO']
             else:
                 vmin, vmax = 0, 200
                 colores = PALETAS_GEE['POTASIO']
@@ -708,25 +705,21 @@ def crear_mapa_arboles(gdf_arboles, gdf_parcela=None):
     return m
 
 # ============================================================================
-# FUNCIONES DE ANÁLISIS EXISTENTES (CON CORRECCIÓN)
+# FUNCIONES DE ANÁLISIS EXISTENTES (SIMPLIFICADAS)
 # ============================================================================
 def analizar_textura_suelo(gdf, cultivo, mes_analisis):
     """Análisis de textura del suelo"""
     zonas_gdf = gdf.copy()
     params = TEXTURA_SUELO_OPTIMA[cultivo]
     
-    # CORRECCIÓN: Usar row.geometry en lugar de gdf.iloc[[idx]]
-    for idx, row in zonas_gdf.iterrows():
-        zonas_gdf.loc[idx, 'area_ha'] = calcular_superficie(row.geometry)
-        zonas_gdf.loc[idx, 'arena'] = random.normalvariate(params['arena_optima'], 5)
-        zonas_gdf.loc[idx, 'limo'] = random.normalvariate(params['limo_optima'], 5)
-        zonas_gdf.loc[idx, 'arcilla'] = 100 - zonas_gdf.loc[idx, 'arena'] - zonas_gdf.loc[idx, 'limo']
-        
-        zonas_gdf.loc[idx, 'textura_suelo'] = clasificar_textura_suelo(
-            zonas_gdf.loc[idx, 'arena'], 
-            zonas_gdf.loc[idx, 'limo'], 
-            zonas_gdf.loc[idx, 'arcilla']
-        )
+    zonas_gdf['area_ha'] = zonas_gdf.geometry.apply(lambda g: calcular_superficie(g))
+    zonas_gdf['arena'] = np.random.normal(params['arena_optima'], 5, len(zonas_gdf))
+    zonas_gdf['limo'] = np.random.normal(params['limo_optima'], 5, len(zonas_gdf))
+    zonas_gdf['arcilla'] = 100 - zonas_gdf['arena'] - zonas_gdf['limo']
+    
+    zonas_gdf['textura_suelo'] = zonas_gdf.apply(
+        lambda row: clasificar_textura_suelo(row['arena'], row['limo'], row['arcilla']), axis=1
+    )
     
     return zonas_gdf
 
@@ -735,13 +728,20 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
     params = PARAMETROS_CULTIVOS[cultivo]
     zonas_gdf = gdf.copy()
     
-    # CORRECCIÓN: Usar row.geometry en lugar de zonas_gdf.iloc[[idx]]
+    # Inicializar columnas
+    zonas_gdf['area_ha'] = 0.0
+    zonas_gdf['nitrogeno'] = 0.0
+    zonas_gdf['fosforo'] = 0.0
+    zonas_gdf['potasio'] = 0.0
+    zonas_gdf['indice_fertilidad'] = 0.0
+    zonas_gdf['categoria'] = "MEDIA"
+    
     for idx, row in zonas_gdf.iterrows():
-        zonas_gdf.loc[idx, 'area_ha'] = calcular_superficie(row.geometry)  # ¡CORREGIDO!
-        zonas_gdf.loc[idx, 'nitrogeno'] = random.normalvariate(params['NITROGENO']['optimo'], 20)
-        zonas_gdf.loc[idx, 'fosforo'] = random.normalvariate(params['FOSFORO']['optimo'], 10)
-        zonas_gdf.loc[idx, 'potasio'] = random.normalvariate(params['POTASIO']['optimo'], 25)
-        zonas_gdf.loc[idx, 'indice_fertilidad'] = random.uniform(0.3, 0.9)
+        zonas_gdf.loc[idx, 'area_ha'] = calcular_superficie(row.geometry)
+        zonas_gdf.loc[idx, 'nitrogeno'] = np.random.normal(params['NITROGENO']['optimo'], 20)
+        zonas_gdf.loc[idx, 'fosforo'] = np.random.normal(params['FOSFORO']['optimo'], 10)
+        zonas_gdf.loc[idx, 'potasio'] = np.random.normal(params['POTASIO']['optimo'], 25)
+        zonas_gdf.loc[idx, 'indice_fertilidad'] = np.random.uniform(0.3, 0.9)
         zonas_gdf.loc[idx, 'categoria'] = random.choice(["EXCELENTE", "ALTA", "MEDIA", "BAJA", "MUY BAJA"])
     
     return zonas_gdf
@@ -768,7 +768,7 @@ def procesar_archivo(uploaded_file):
                     return None
             
             if not gdf.is_valid.all():
-                gdf = gdf.make_valid()
+                gdf = gpd.make_valid(gdf)
             
             return gdf
             
@@ -812,7 +812,7 @@ def mostrar_configuracion_parcela():
     
     st.success("✅ Parcela cargada correctamente")
     
-    area_total = sum(calcular_superficie(geom) for geom in gdf_original.geometry)
+    area_total = calcular_superficie(gdf_original.iloc[0].geometry) * len(gdf_original)
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("📐 Área Total", f"{area_total:.2f} ha")
