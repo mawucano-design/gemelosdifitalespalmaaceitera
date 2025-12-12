@@ -452,24 +452,33 @@ def calcular_superficie(gdf):
         except:
             return 1.0  # Valor por defecto
 
-# FUNCIÓN MEJORADA PARA CREAR MAPA INTERACTIVO CON ESRI SATELITE - ACTUALIZADA
-def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=None, nutriente=None):
-    """Crea mapa interactivo con base ESRI Satélite - MEJORADO"""
+# FUNCIÓN MEJORADA PARA CREAR MAPA INTERACTIVO CON OPENSTREETMAP - ACTUALIZADA
+def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, nutriente=None):
+    """Crea mapa interactivo con base OpenStreetMap - MEJORADO"""
     
     # Obtener centro y bounds del GeoDataFrame
     centroid = gdf.geometry.centroid.iloc[0]
     bounds = gdf.total_bounds
     
-    # Crear mapa centrado con ESRI Satélite por defecto
+    # Crear mapa centrado con OpenStreetMap por defecto
     m = folium.Map(
         location=[centroid.y, centroid.x],
         zoom_start=15,
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri',
-        name='Esri Satélite'
+        tiles='OpenStreetMap',
+        attr='© OpenStreetMap contributors',
+        name='OpenStreetMap'
     )
     
     # Añadir otras bases como opciones
+    # ESRI Satélite
+    folium.TileLayer(
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr='Esri',
+        name='Esri Satélite',
+        overlay=False
+    ).add_to(m)
+    
+    # ESRI Calles
     folium.TileLayer(
         tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
         attr='Esri',
@@ -477,17 +486,19 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
         overlay=False
     ).add_to(m)
     
+    # CartoDB Positron (alternativa clara)
     folium.TileLayer(
-        tiles='OpenStreetMap',
-        name='OpenStreetMap',
+        tiles='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attr='CartoDB',
+        name='CartoDB Positron',
         overlay=False
     ).add_to(m)
     
-    # Añadir capa de relieve
+    # OpenTopoMap (mapa topográfico)
     folium.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri',
-        name='Relieve',
+        tiles='https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        attr='OpenTopoMap',
+        name='OpenTopoMap',
         overlay=False
     ).add_to(m)
 
@@ -713,7 +724,8 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
         
         legend_html += '''
             <div style="margin-top: 10px; font-size: 10px; color: #666;">
-                💡 Click en las zonas para detalles
+                💡 Click en las zonas para detalles<br>
+                🗺️ Usa el control de capas para cambiar el mapa base
             </div>
         </div>
         '''
@@ -723,32 +735,33 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
 
 # FUNCIÓN PARA CREAR MAPA VISUALIZADOR DE PARCELA
 def crear_mapa_visualizador_parcela(gdf):
-    """Crea mapa interactivo para visualizar la parcela original con ESRI Satélite"""
+    """Crea mapa interactivo para visualizar la parcela original con OpenStreetMap"""
     
     # Obtener centro y bounds
     centroid = gdf.geometry.centroid.iloc[0]
     bounds = gdf.total_bounds
     
-    # Crear mapa con ESRI Satélite por defecto
+    # Crear mapa con OpenStreetMap por defecto
     m = folium.Map(
         location=[centroid.y, centroid.x],
         zoom_start=14,
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri',
-        name='Esri Satélite'
+        tiles='OpenStreetMap',
+        attr='© OpenStreetMap contributors',
+        name='OpenStreetMap'
     )
     
     # Añadir otras bases
     folium.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attr='Esri',
-        name='Esri Calles',
+        name='Esri Satélite',
         overlay=False
     ).add_to(m)
     
     folium.TileLayer(
-        tiles='OpenStreetMap',
-        name='OpenStreetMap',
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        attr='Esri',
+        name='Esri Calles',
         overlay=False
     ).add_to(m)
     
@@ -793,6 +806,7 @@ def crear_mapa_visualizador_parcela(gdf):
     <p><b>Leyenda:</b></p>
     <p><i style="background:#1f77b4; width:20px; height:20px; display:inline-block; margin-right:5px; opacity:0.4;"></i> Área de la parcela</p>
     <p><i style="background:#2ca02c; width:20px; height:20px; display:inline-block; margin_right:5px; opacity:0.8;"></i> Borde de la parcela</p>
+    <p><small>🗺️ Usa el control de capas para cambiar el mapa base</small></p>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -1968,7 +1982,7 @@ def mostrar_resultados_textura():
     # Mapa de texturas
     st.subheader("🗺️ Mapa de Texturas del Suelo")
     if 'textura_suelo' in gdf_textura.columns:
-        mapa_textura = crear_mapa_interactivo_esri(
+        mapa_textura = crear_mapa_interactivo(
             gdf_textura, 
             f"Textura del Suelo - {cultivo.replace('_', ' ').title()}", 
             'textura_suelo', 
@@ -2155,7 +2169,7 @@ def mostrar_resultados_principales():
         titulo_mapa = f"Recomendación {nutriente} - {cultivo.replace('_', ' ').title()}"
     
     # Crear y mostrar mapa interactivo
-    mapa_analisis = crear_mapa_interactivo_esri(
+    mapa_analisis = crear_mapa_interactivo(
         gdf_analisis, titulo_mapa, columna_visualizar, analisis_tipo, nutriente
     )
     st_folium(mapa_analisis, width=800, height=500)
@@ -2264,6 +2278,8 @@ def mostrar_modo_demo():
     - Clasificación USDA de texturas
     - Propiedades físicas del suelo
     - Recomendaciones específicas por textura
+    
+    **🗺️ Mapas:** Usamos OpenStreetMap como base principal
     """)
     
     # Ejemplo de datos de demostración
@@ -2295,6 +2311,7 @@ def mostrar_configuracion_parcela():
     
     # VISUALIZADOR DE PARCELA ORIGINAL
     st.markdown("### 🗺️ Visualizador de Parcela")
+    st.info("🗺️ **Mapa base:** OpenStreetMap. Usa el control de capas para cambiar a ESRI Satélite o otras opciones.")
     
     # Crear y mostrar mapa interactivo
     mapa_parcela = crear_mapa_visualizador_parcela(gdf_original)
@@ -2343,6 +2360,7 @@ def main():
     - **Modelos predictivos** de nutrientes
     - **Análisis de textura** del suelo
     - **Enfoque agroecológico** integrado
+    - **OpenStreetMap** como base cartográfica
     """)
 
     # Procesar archivo subido si existe
