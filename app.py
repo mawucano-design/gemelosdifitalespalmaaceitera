@@ -3,7 +3,7 @@ import geopandas as gpd
 from shapely.geometry import Polygon
 from datetime import datetime
 
-# Importar funciones desde los módulos organizados
+# Importar funciones desde módulos organizados
 from src.utils.ui_helpers import (
     mostrar_modo_demo,
     mostrar_configuracion_parcela,
@@ -73,27 +73,34 @@ if st.session_state.datos_demo and st.session_state.gdf_original is None:
     )
     st.session_state.gdf_original = gdf_demo
 
+# Calcular área total una vez (si hay parcela)
+if st.session_state.gdf_original is not None:
+    from src.data.file_loader import calcular_superficie
+    st.session_state.area_total = float(calcular_superficie(st.session_state.gdf_original).sum())
+else:
+    st.session_state.area_total = 0.0
+
 # Mostrar interfaz según estado
 if st.session_state.analisis_completado:
     if analisis_tipo == "ANÁLISIS DE TEXTURA":
-        mostrar_resultados_textura()
+        mostrar_resultados_textura(cultivo, mes_analisis, st.session_state.area_total)
     else:
         tab1, tab2 = st.tabs(["📊 Análisis Principal", "🏗️ Análisis de Textura"])
         with tab1:
-            mostrar_resultados_principales()
+            mostrar_resultados_principales(cultivo, analisis_tipo, nutriente, mes_analisis, st.session_state.area_total)
         with tab2:
             if st.session_state.get('analisis_textura') is not None:
-                mostrar_resultados_textura()
+                mostrar_resultados_textura(cultivo, mes_analisis, st.session_state.area_total)
             else:
                 st.info("Ejecuta el análisis principal para obtener datos de textura")
 elif st.session_state.gdf_original is not None:
-    mostrar_configuracion_parcela()
+    mostrar_configuracion_parcela(cultivo, n_divisiones)
 else:
     mostrar_modo_demo()
 
 # Información adicional en sidebar
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📊 Métodología GEE")
+st.sidebar.markdown("### 📊 Metodología GEE")
 st.sidebar.info("""
 Esta aplicación utiliza:
 - **Google Earth Engine** para análisis satelital
