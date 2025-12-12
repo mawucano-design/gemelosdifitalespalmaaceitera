@@ -1,9 +1,20 @@
+import uuid
+from datetime import datetime
+
 class TreeRegistry:
     def __init__(self):
-        self.trees = {}  # {tree_id: {gps, cultivo, edad, variedad, historial}}
+        self.trees = {}
 
-    def register_tree(self, tree_id: str, gps: tuple, metadata: dict):
-        self.trees[tree_id] = {"gps": gps, **metadata}
-
-    def get_tree(self, tree_id: str):
-        return self.trees.get(tree_id)
+    def register_trees_from_boxes(self, boxes, parcela_id: str):
+        trees = []
+        for i, box in enumerate(boxes):
+            tree_id = f"{parcela_id}_tree_{i+1}"
+            self.trees[tree_id] = {
+                "id": tree_id,
+                "detection_bbox": box,
+                "parcela_id": parcela_id,
+                "fecha_registro": datetime.now().isoformat(),
+                "estado_actual": "activo"
+            }
+            trees.append(tree_id)
+        return trees
