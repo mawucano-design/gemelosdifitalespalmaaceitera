@@ -1,25 +1,16 @@
-# Librerías base
 streamlit==1.32.0
-numpy==1.26.0
-pandas==2.2.0
-
-# Geoespaciales (versiones clave)
 geopandas==0.14.0
-shapely==2.0.3
-fiona==1.9.6
-pyproj==3.6.1
-rtree==1.1.0
-
-# Visualización y mapas
+pandas==2.2.0
+numpy==1.26.0
+matplotlib==3.8.0
 folium==0.15.1
 streamlit-folium==0.15.1
-matplotlib==3.8.0
-
-# Imágenes y PDF
-Pillow==10.2.0
+shapely==2.0.3
 reportlab==4.1.0
-opencv-python-headless==4.9.0.80  # Usa 'headless' para servidores
-rasterio==1.3.10
-
-# Utilidades
+Pillow==10.2.0
+fiona==1.9.6
+opencv-python-headless==4.9.0.80
 requests==2.31.0
+rasterio==1.3.10
+pyproj==3.6.1
+rtree==1.1.0
