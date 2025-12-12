@@ -4,7 +4,19 @@ from PIL import Image
 import numpy as np
 from ultralytics import YOLO
 import streamlit as st
+from shapely.geometry import box
+import geopandas as gpd
 
+def boxes_to_geojson(boxes, crs):
+    """Convierte bounding boxes a GeoDataFrame"""
+    polygons = []
+    for b in boxes:
+        # Asumir que la imagen está georreferenciada (para simplificar)
+        # En producción: usa los metadatos de la imagen para georreferenciar
+        poly = box(b[0], b[1], b[2], b[3])
+        polygons.append(poly)
+    gdf = gpd.GeoDataFrame({'id_zona': range(1, len(polygons)+1)}, geometry=polygons, crs=crs)
+    return gdf
 # Descargar modelo preentrenado (solo si no existe)
 def _download_model():
     model_path = "models/palm_tree_yolov8n.pt"
