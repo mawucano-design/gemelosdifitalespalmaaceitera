@@ -32,6 +32,16 @@ Aplicación web para análisis de fertilidad y recomendaciones NPK en cultivos d
 - Manejo ecológico de plagas
 - Asociaciones y diversificación de cultivos
 
+## 🗺️ Hoja de Ruta: Hacia el Digital Twin por Árbol
+
+Esta aplicación está diseñada para evolucionar desde zonas de manejo hacia un gemelo digital **por árbol**, siguiendo el enfoque del artículo de LinkedIn:
+
+- **Fase 1 (Actual)**: Análisis por zonas con simulación GEE y agroecología.
+- **Fase 2**: Integración con datos reales de drones (multiespectral) y detección de árboles (CV).
+- **Fase 3**: Motor de decisiones con IA generativa (RAG) y recomendaciones dinámicas.
+- **Fase 4**: Sincronización con ERP (SAP/mySAP365) para operaciones del campo.
+- **Fase 5**: Digital Twin vivo por árbol, con historial, sensores y alertas predictivas.
+
 ## 📦 Instalación
 
 ### Requisitos Previos
