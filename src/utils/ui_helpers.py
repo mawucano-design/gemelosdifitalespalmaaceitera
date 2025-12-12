@@ -1,6 +1,7 @@
 import streamlit as st
 import geopandas as gpd
 import numpy as np
+from streamlit_folium import st_folium
 from datetime import datetime
 from shapely.geometry import Polygon
 from src.data.file_loader import calcular_superficie, procesar_archivo
@@ -79,7 +80,6 @@ def mostrar_resultados_textura():
         'textura_suelo', 
         "ANÁLISIS DE TEXTURA"
     )
-    st_folium = st_folium or __import__('streamlit_folium', fromlist=['st_folium']).st_folium
     st_folium(mapa_textura, width=800, height=500)
     # Tabla detallada
     st.subheader("📋 Tabla de Resultados por Zona")
