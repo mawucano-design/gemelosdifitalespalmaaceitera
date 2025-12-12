@@ -254,7 +254,7 @@ FACTORES_N_MES = {
 
 FACTORES_P_MES = {
     "ENERO": 1.0, "FEBRERO": 1.0, "MARZO": 1.05, "ABRIL": 1.1,
-    "MAYO": 1.15, "JUNIO": 1.1, "JULio": 1.05, "AGOSTO": 1.0,
+    "MAYO": 1.15, "JUNIO": 1.1, "JULIO": 1.05, "AGOSTO": 1.0,
     "SEPTIEMBRE": 1.0, "OCTUBRE": 1.05, "NOVIEMBRE": 1.1, "DICIEMBRE": 1.05
 }
 
@@ -473,7 +473,7 @@ class DigitalTwinBuilder:
             return None
 
 # ============================================================================
-# FUNCIONES AUXILIARES EXISTENTES
+# FUNCIONES AUXILIARES EXISTENTES (CON CORRECCIÓN CRÍTICA)
 # ============================================================================
 def clasificar_textura_suelo(arena, limo, arcilla):
     """Clasifica la textura del suelo según USDA"""
@@ -502,38 +502,41 @@ def clasificar_textura_suelo(arena, limo, arcilla):
     except Exception as e:
         return "NO_DETERMINADA"
 
-def calcular_superficie(gdf):
-    """Calcula superficie en hectáreas con manejo robusto de CRS"""
+# ============================================================================
+# FUNCIÓN CALCULAR_SUPERFICIE COMPLETAMENTE REESCRITA
+# ============================================================================
+def calcular_superficie(geom):
+    """Calcula superficie en hectáreas para una geometría individual (Polygon/MultiPolygon)"""
     try:
-        if gdf.empty or gdf.geometry.isnull().all():
+        if geom is None or geom.is_empty:
             return 0.0
-            
-        # Verificar si el CRS es geográfico (grados)
-        if gdf.crs and gdf.crs.is_geographic:
-            # Convertir a un CRS proyectado para cálculo de área precisa
+        
+        # Crear un GeoDataFrame temporal con una sola fila para facilitar la transformación
+        gdf_temp = gpd.GeoDataFrame({'geometry': [geom]}, crs='EPSG:4326')
+        
+        # Si la geometría está en grados (coordenadas geográficas), proyectar a metros
+        if gdf_temp.crs.is_geographic:
             try:
-                # Usar UTM adecuado (aquí se usa un CRS común para Colombia)
-                gdf_proj = gdf.to_crs('EPSG:3116')  # MAGNA-SIRGAS / Colombia West zone
-                area_m2 = gdf_proj.geometry.area
-            except:
-                # Fallback: conversión aproximada (1 grado ≈ 111km en ecuador)
-                area_m2 = gdf.geometry.area * 111000 * 111000
+                # Proyección UTM para Colombia (ajustar según zona)
+                gdf_proj = gdf_temp.to_crs('EPSG:3116')  # MAGNA-SIRGAS / Colombia West zone
+                area_m2 = gdf_proj.geometry.area.iloc[0]
+            except Exception as proj_error:
+                # Fallback: aproximación simple (1 grado ≈ 111,111 metros)
+                area_m2 = geom.area * 111111 * 111111
         else:
-            # Asumir que ya está en metros
-            area_m2 = gdf.geometry.area
-            
-        # ***** CORRECIÓN CLAVE AQUÍ *****
-        # Asegurar que devolvemos un solo número float, no una Serie
-        area_ha = (area_m2 / 10000).sum()  # .sum() convierte Serie -> float
-        return float(area_ha)  # float() para seguridad extra
+            # Asumir que ya está en un sistema proyectado (metros)
+            area_m2 = geom.area
+        
+        # Convertir metros cuadrados a hectáreas
+        area_ha = area_m2 / 10000.0
+        return float(area_ha)
         
     except Exception as e:
-        # Fallback simple
+        # Fallback en caso de cualquier error
         try:
-            # Asegurar que también aquí devolvemos float
-            return float(gdf.geometry.area.mean() / 10000)
+            return float(geom.area / 10000.0)
         except:
-            return 1.0  # Valor por defecto
+            return 1.0  # Valor por defecto seguro
 
 def dividir_parcela_en_zonas(gdf, n_zonas):
     """Divide la parcela en zonas de manejo"""
@@ -705,21 +708,25 @@ def crear_mapa_arboles(gdf_arboles, gdf_parcela=None):
     return m
 
 # ============================================================================
-# FUNCIONES DE ANÁLISIS EXISTENTES (SIMPLIFICADAS)
+# FUNCIONES DE ANÁLISIS EXISTENTES (CON CORRECCIÓN)
 # ============================================================================
 def analizar_textura_suelo(gdf, cultivo, mes_analisis):
     """Análisis de textura del suelo"""
     zonas_gdf = gdf.copy()
     params = TEXTURA_SUELO_OPTIMA[cultivo]
     
-    zonas_gdf['area_ha'] = zonas_gdf.geometry.apply(lambda g: calcular_superficie(gpd.GeoDataFrame([{'geometry': g}])))
-    zonas_gdf['arena'] = np.random.normal(params['arena_optima'], 5, len(zonas_gdf))
-    zonas_gdf['limo'] = np.random.normal(params['limo_optima'], 5, len(zonas_gdf))
-    zonas_gdf['arcilla'] = 100 - zonas_gdf['arena'] - zonas_gdf['limo']
-    
-    zonas_gdf['textura_suelo'] = zonas_gdf.apply(
-        lambda row: clasificar_textura_suelo(row['arena'], row['limo'], row['arcilla']), axis=1
-    )
+    # CORRECCIÓN: Usar row.geometry en lugar de gdf.iloc[[idx]]
+    for idx, row in zonas_gdf.iterrows():
+        zonas_gdf.loc[idx, 'area_ha'] = calcular_superficie(row.geometry)
+        zonas_gdf.loc[idx, 'arena'] = random.normalvariate(params['arena_optima'], 5)
+        zonas_gdf.loc[idx, 'limo'] = random.normalvariate(params['limo_optima'], 5)
+        zonas_gdf.loc[idx, 'arcilla'] = 100 - zonas_gdf.loc[idx, 'arena'] - zonas_gdf.loc[idx, 'limo']
+        
+        zonas_gdf.loc[idx, 'textura_suelo'] = clasificar_textura_suelo(
+            zonas_gdf.loc[idx, 'arena'], 
+            zonas_gdf.loc[idx, 'limo'], 
+            zonas_gdf.loc[idx, 'arcilla']
+        )
     
     return zonas_gdf
 
@@ -728,13 +735,13 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
     params = PARAMETROS_CULTIVOS[cultivo]
     zonas_gdf = gdf.copy()
     
-    # Simular datos
-    for idx in range(len(zonas_gdf)):
-        zonas_gdf.loc[idx, 'area_ha'] = calcular_superficie(zonas_gdf.iloc[[idx]])
-        zonas_gdf.loc[idx, 'nitrogeno'] = np.random.normal(params['NITROGENO']['optimo'], 20)
-        zonas_gdf.loc[idx, 'fosforo'] = np.random.normal(params['FOSFORO']['optimo'], 10)
-        zonas_gdf.loc[idx, 'potasio'] = np.random.normal(params['POTASIO']['optimo'], 25)
-        zonas_gdf.loc[idx, 'indice_fertilidad'] = np.random.uniform(0.3, 0.9)
+    # CORRECCIÓN: Usar row.geometry en lugar de zonas_gdf.iloc[[idx]]
+    for idx, row in zonas_gdf.iterrows():
+        zonas_gdf.loc[idx, 'area_ha'] = calcular_superficie(row.geometry)  # ¡CORREGIDO!
+        zonas_gdf.loc[idx, 'nitrogeno'] = random.normalvariate(params['NITROGENO']['optimo'], 20)
+        zonas_gdf.loc[idx, 'fosforo'] = random.normalvariate(params['FOSFORO']['optimo'], 10)
+        zonas_gdf.loc[idx, 'potasio'] = random.normalvariate(params['POTASIO']['optimo'], 25)
+        zonas_gdf.loc[idx, 'indice_fertilidad'] = random.uniform(0.3, 0.9)
         zonas_gdf.loc[idx, 'categoria'] = random.choice(["EXCELENTE", "ALTA", "MEDIA", "BAJA", "MUY BAJA"])
     
     return zonas_gdf
@@ -805,7 +812,7 @@ def mostrar_configuracion_parcela():
     
     st.success("✅ Parcela cargada correctamente")
     
-    area_total = calcular_superficie(gdf_original).sum()
+    area_total = sum(calcular_superficie(geom) for geom in gdf_original.geometry)
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("📐 Área Total", f"{area_total:.2f} ha")
