@@ -8,7 +8,6 @@ from src.utils.constants import (
     RECOMENDACIONES_TEXTURA
 )
 from src.data.file_loader import calcular_superficie
-from src.data.textura_suelo import calcular_propiedades_fisicas_suelo, evaluar_adecuacion_textura, clasificar_textura_suelo
 
 def clasificar_textura_suelo(arena, limo, arcilla):
     """Clasifica la textura del suelo según el triángulo de texturas USDA"""
