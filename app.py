@@ -15,7 +15,7 @@ import folium
 from folium import plugins
 from streamlit_folium import st_folium
 from reportlab.lib.pagesizes import A4
-from reportlit.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
