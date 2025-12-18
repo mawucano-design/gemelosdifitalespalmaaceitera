@@ -259,7 +259,7 @@ PALETAS_GEE = {
 }
 
 # ============================================================================
-# INICIALIZACIÓN DE SESSION_STATE (¡IMPORTANTE!)
+# INICIALIZACIÓN DE SESSION_STATE
 # ============================================================================
 if 'analisis_completado' not in st.session_state:
     st.session_state.analisis_completado = False
@@ -285,33 +285,58 @@ if 'n_divisiones' not in st.session_state:
     st.session_state.n_divisiones = 24
 
 # ============================================================================
-# SIDEBAR
-# ============================================================================
-with st.sidebar:
-    st.header("⚙️ Configuración")
-    st.session_state.cultivo = st.selectbox("Cultivo:", 
-                          ["PALMA_ACEITERA", "CACAO", "BANANO"])
-    st.session_state.analisis_tipo = st.selectbox("Tipo de Análisis:", 
-                               ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK", "ANÁLISIS DE TEXTURA"])
-    st.session_state.nutriente = st.selectbox("Nutriente:", ["NITRÓGENO", "FÓSFORO", "POTASIO"])
-    st.session_state.mes_analisis = st.selectbox("Mes de Análisis:", 
-                               ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-                                "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"])
-    st.session_state.n_divisiones = st.slider("Número de zonas de manejo:", min_value=16, max_value=32, value=24)
-    st.subheader("📤 Subir Parcela")
-    uploaded_file = st.file_uploader("Subir ZIP con shapefile o archivo KML de tu parcela", type=['zip', 'kml'])
-    if st.button("🔄 Reiniciar Análisis"):
-        st.session_state.analisis_completado = False
-        st.session_state.gdf_original = None
-        st.session_state.gdf_analisis = None
-        st.session_state.analisis_textura = None
-        st.session_state.area_total = 0.0
-        st.session_state.datos_demo = False
-        st.rerun()
-
-# ============================================================================
 # FUNCIONES AUXILIARES
 # ============================================================================
+
+def calcular_superficie(gdf):
+    """Calcula superficie en hectáreas con manejo robusto de CRS"""
+    try:
+        if gdf is None or gdf.empty or gdf.geometry.isnull().all():
+            return 0.0
+        if gdf.crs and gdf.crs.is_geographic:
+            try:
+                gdf_proj = gdf.to_crs('EPSG:3116')
+                area_m2 = gdf_proj.geometry.area
+            except:
+                try:
+                    gdf_proj = gdf.to_crs('EPSG:3857')
+                    area_m2 = gdf_proj.geometry.area
+                except:
+                    area_m2 = gdf.geometry.area.mean() * 111000 * 111000
+        else:
+            area_m2 = gdf.geometry.area
+        area_ha = area_m2 / 10000
+        return float(area_ha) if not np.isnan(area_ha) else 0.0
+    except:
+        return 0.0
+
+def procesar_archivo(uploaded_file):
+    """Procesa el archivo ZIP con shapefile o archivo KML"""
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            file_path = os.path.join(tmp_dir, uploaded_file.name)
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+            if uploaded_file.name.lower().endswith('.kml'):
+                gdf = gpd.read_file(file_path, driver='KML')
+            else:
+                with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    zip_ref.extractall(tmp_dir)
+                shp_files = [f for f in os.listdir(tmp_dir) if f.endswith('.shp')]
+                kml_files = [f for f in os.listdir(tmp_dir) if f.endswith('.kml')]
+                if shp_files:
+                    shp_path = os.path.join(tmp_dir, shp_files[0])
+                    gdf = gpd.read_file(shp_path)
+                elif kml_files:
+                    kml_path = os.path.join(tmp_dir, kml_files[0])
+                    gdf = gpd.read_file(kml_path, driver='KML')
+                else:
+                    return None
+            if not gdf.is_valid.all():
+                gdf = gdf.make_valid()
+            return gdf
+    except:
+        return None
 
 def clasificar_textura_suelo(arena, limo, arcilla):
     try:
@@ -336,51 +361,135 @@ def clasificar_textura_suelo(arena, limo, arcilla):
     except:
         return "NO_DETERMINADA"
 
-def calcular_superficie(gdf):
-    try:
-        if gdf.empty or gdf.geometry.isnull().all():
-            return 0.0
-        if gdf.crs and gdf.crs.is_geographic:
-            try:
-                gdf_proj = gdf.to_crs('EPSG:3116')
-                area_m2 = gdf_proj.geometry.area
-            except:
-                area_m2 = gdf.geometry.area * 111000 * 111000
-        else:
-            area_m2 = gdf.geometry.area
-        return area_m2 / 10000
-    except:
-        try:
-            return gdf.geometry.area.mean() / 10000
-        except:
-            return 1.0
+def calcular_propiedades_fisicas_suelo(textura, materia_organica):
+    propiedades = {
+        'capacidad_campo': 0.0,
+        'punto_marchitez': 0.0,
+        'agua_disponible': 0.0,
+        'densidad_aparente': 0.0,
+        'porosidad': 0.0,
+        'conductividad_hidraulica': 0.0
+    }
+    base_propiedades = {
+        'Arcilloso': {'cc': 350, 'pm': 200, 'da': 1.3, 'porosidad': 0.5, 'kh': 0.1},
+        'Franco Arcilloso': {'cc': 300, 'pm': 150, 'da': 1.25, 'porosidad': 0.53, 'kh': 0.5},
+        'Franco': {'cc': 250, 'pm': 100, 'da': 1.2, 'porosidad': 0.55, 'kh': 1.5},
+        'Franco Arcilloso-Arenoso': {'cc': 180, 'pm': 80, 'da': 1.35, 'porosidad': 0.49, 'kh': 5.0},
+        'Arenoso': {'cc': 120, 'pm': 50, 'da': 1.5, 'porosidad': 0.43, 'kh': 15.0}
+    }
+    if textura in base_propiedades:
+        base = base_propiedades[textura]
+        factor_mo = 1.0 + (materia_organica * 0.05)
+        propiedades['capacidad_campo'] = base['cc'] * factor_mo
+        propiedades['punto_marchitez'] = base['pm'] * factor_mo
+        propiedades['agua_disponible'] = (base['cc'] - base['pm']) * factor_mo
+        propiedades['densidad_aparente'] = base['da'] / factor_mo
+        propiedades['porosidad'] = min(0.65, base['porosidad'] * factor_mo)
+        propiedades['conductividad_hidraulica'] = base['kh'] * factor_mo
+    return propiedades
 
-def procesar_archivo(uploaded_file):
-    try:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            file_path = os.path.join(tmp_dir, uploaded_file.name)
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getvalue())
-            if uploaded_file.name.lower().endswith('.kml'):
-                gdf = gpd.read_file(file_path, driver='KML')
+def evaluar_adecuacion_textura(textura_actual, cultivo):
+    textura_optima = TEXTURA_SUELO_OPTIMA[cultivo]['textura_optima']
+    jerarquia_texturas = {
+        'Arenoso': 1,
+        'Franco Arcilloso-Arenoso': 2,
+        'Franco': 3,
+        'Franco Arcilloso': 4,
+        'Arcilloso': 5
+    }
+    if textura_actual not in jerarquia_texturas:
+        return "NO_DETERMINADA", 0
+    actual_idx = jerarquia_texturas[textura_actual]
+    optima_idx = jerarquia_texturas[textura_optima]
+    diferencia = abs(actual_idx - optima_idx)
+    if diferencia == 0:
+        return "ÓPTIMA", 1.0
+    elif diferencia == 1:
+        return "ADECUADA", 0.8
+    elif diferencia == 2:
+        return "MODERADA", 0.6
+    elif diferencia == 3:
+        return "LIMITANTE", 0.4
+    else:
+        return "MUY LIMITANTE", 0.2
+
+def analizar_textura_suelo(gdf, cultivo, mes_analisis):
+    params_textura = TEXTURA_SUELO_OPTIMA[cultivo]
+    zonas_gdf = gdf.copy()
+    zonas_gdf['area_ha'] = 0.0
+    zonas_gdf['arena'] = 0.0
+    zonas_gdf['limo'] = 0.0
+    zonas_gdf['arcilla'] = 0.0
+    zonas_gdf['textura_suelo'] = "NO_DETERMINADA"
+    zonas_gdf['adecuacion_textura'] = 0.0
+    zonas_gdf['categoria_adecuacion'] = "NO_DETERMINADA"
+    zonas_gdf['capacidad_campo'] = 0.0
+    zonas_gdf['punto_marchitez'] = 0.0
+    zonas_gdf['agua_disponible'] = 0.0
+    zonas_gdf['densidad_aparente'] = 0.0
+    zonas_gdf['porosidad'] = 0.0
+    zonas_gdf['conductividad_hidraulica'] = 0.0
+    for idx, row in zonas_gdf.iterrows():
+        try:
+            area_ha = calcular_superficie(zonas_gdf.iloc[[idx]])
+            if hasattr(row.geometry, 'centroid'):
+                centroid = row.geometry.centroid
             else:
-                with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                    zip_ref.extractall(tmp_dir)
-                shp_files = [f for f in os.listdir(tmp_dir) if f.endswith('.shp')]
-                kml_files = [f for f in os.listdir(tmp_dir) if f.endswith('.kml')]
-                if shp_files:
-                    shp_path = os.path.join(tmp_dir, shp_files[0])
-                    gdf = gpd.read_file(shp_path)
-                elif kml_files:
-                    kml_path = os.path.join(tmp_dir, kml_files[0])
-                    gdf = gpd.read_file(kml_path, driver='KML')
-                else:
-                    return None
-            if not gdf.is_valid.all():
-                gdf = gdf.make_valid()
-            return gdf
-    except Exception as e:
-        return None
+                centroid = row.geometry.representative_point()
+            seed_value = abs(hash(f"{centroid.x:.6f}_{centroid.y:.6f}_{cultivo}_textura")) % (2**32)
+            rng = np.random.RandomState(seed_value)
+            lat_norm = (centroid.y + 90) / 180 if centroid.y else 0.5
+            lon_norm = (centroid.x + 180) / 360 if centroid.x else 0.5
+            variabilidad_local = 0.15 + 0.7 * (lat_norm * lon_norm)
+            arena_optima = params_textura['arena_optima']
+            limo_optima = params_textura['limo_optima']
+            arcilla_optima = params_textura['arcilla_optima']
+            arena = max(5, min(95, rng.normal(
+                arena_optima * (0.8 + 0.4 * variabilidad_local),
+                arena_optima * 0.2
+            )))
+            limo = max(5, min(95, rng.normal(
+                limo_optima * (0.7 + 0.6 * variabilidad_local),
+                limo_optima * 0.25
+            )))
+            arcilla = max(5, min(95, rng.normal(
+                arcilla_optima * (0.75 + 0.5 * variabilidad_local),
+                arcilla_optima * 0.3
+            )))
+            total = arena + limo + arcilla
+            arena = (arena / total) * 100
+            limo = (limo / total) * 100
+            arcilla = (arcilla / total) * 100
+            textura = clasificar_textura_suelo(arena, limo, arcilla)
+            categoria_adecuacion, puntaje_adecuacion = evaluar_adecuacion_textura(textura, cultivo)
+            materia_organica = max(1.0, min(8.0, rng.normal(3.0, 1.0)))
+            propiedades_fisicas = calcular_propiedades_fisicas_suelo(textura, materia_organica)
+            zonas_gdf.loc[idx, 'area_ha'] = area_ha
+            zonas_gdf.loc[idx, 'arena'] = arena
+            zonas_gdf.loc[idx, 'limo'] = limo
+            zonas_gdf.loc[idx, 'arcilla'] = arcilla
+            zonas_gdf.loc[idx, 'textura_suelo'] = textura
+            zonas_gdf.loc[idx, 'adecuacion_textura'] = puntaje_adecuacion
+            zonas_gdf.loc[idx, 'categoria_adecuacion'] = categoria_adecuacion
+            zonas_gdf.loc[idx, 'capacidad_campo'] = propiedades_fisicas['capacidad_campo']
+            zonas_gdf.loc[idx, 'punto_marchitez'] = propiedades_fisicas['punto_marchitez']
+            zonas_gdf.loc[idx, 'agua_disponible'] = propiedades_fisicas['agua_disponible']
+            zonas_gdf.loc[idx, 'densidad_aparente'] = propiedades_fisicas['densidad_aparente']
+            zonas_gdf.loc[idx, 'porosidad'] = propiedades_fisicas['porosidad']
+            zonas_gdf.loc[idx, 'conductividad_hidraulica'] = propiedades_fisicas['conductividad_hidraulica']
+        except:
+            area_ha = calcular_superficie(zonas_gdf.iloc[[idx]])
+            zonas_gdf.loc[idx, 'area_ha'] = area_ha
+            zonas_gdf.loc[idx, 'arena'] = params_textura['arena_optima']
+            zonas_gdf.loc[idx, 'limo'] = params_textura['limo_optima']
+            zonas_gdf.loc[idx, 'arcilla'] = params_textura['arcilla_optima']
+            zonas_gdf.loc[idx, 'textura_suelo'] = params_textura['textura_optima']
+            zonas_gdf.loc[idx, 'adecuacion_textura'] = 1.0
+            zonas_gdf.loc[idx, 'categoria_adecuacion'] = "ÓPTIMA"
+            propiedades_default = calcular_propiedades_fisicas_suelo(params_textura['textura_optima'], 3.0)
+            for prop, valor in propiedades_default.items():
+                zonas_gdf.loc[idx, prop] = valor
+    return zonas_gdf
 
 def dividir_parcela_en_zonas(gdf, n_zonas):
     try:
@@ -442,113 +551,6 @@ def dividir_parcela_en_zonas(gdf, n_zonas):
     except:
         return gdf
 
-def calcular_propiedades_fisicas_suelo(textura, materia_organica):
-    propiedades = {'capacidad_campo': 0.0, 'punto_marchitez': 0.0, 'agua_disponible': 0.0, 'densidad_aparente': 0.0, 'porosidad': 0.0, 'conductividad_hidraulica': 0.0}
-    base_propiedades = {
-        'Arcilloso': {'cc': 350, 'pm': 200, 'da': 1.3, 'porosidad': 0.5, 'kh': 0.1},
-        'Franco Arcilloso': {'cc': 300, 'pm': 150, 'da': 1.25, 'porosidad': 0.53, 'kh': 0.5},
-        'Franco': {'cc': 250, 'pm': 100, 'da': 1.2, 'porosidad': 0.55, 'kh': 1.5},
-        'Franco Arcilloso-Arenoso': {'cc': 180, 'pm': 80, 'da': 1.35, 'porosidad': 0.49, 'kh': 5.0},
-        'Arenoso': {'cc': 120, 'pm': 50, 'da': 1.5, 'porosidad': 0.43, 'kh': 15.0}
-    }
-    if textura in base_propiedades:
-        base = base_propiedades[textura]
-        factor_mo = 1.0 + (materia_organica * 0.05)
-        propiedades['capacidad_campo'] = base['cc'] * factor_mo
-        propiedades['punto_marchitez'] = base['pm'] * factor_mo
-        propiedades['agua_disponible'] = (base['cc'] - base['pm']) * factor_mo
-        propiedades['densidad_aparente'] = base['da'] / factor_mo
-        propiedades['porosidad'] = min(0.65, base['porosidad'] * factor_mo)
-        propiedades['conductividad_hidraulica'] = base['kh'] * factor_mo
-    return propiedades
-
-def evaluar_adecuacion_textura(textura_actual, cultivo):
-    textura_optima = TEXTURA_SUELO_OPTIMA[cultivo]['textura_optima']
-    jerarquia_texturas = {'Arenoso': 1, 'Franco Arcilloso-Arenoso': 2, 'Franco': 3, 'Franco Arcilloso': 4, 'Arcilloso': 5}
-    if textura_actual not in jerarquia_texturas:
-        return "NO_DETERMINADA", 0
-    actual_idx = jerarquia_texturas[textura_actual]
-    optima_idx = jerarquia_texturas[textura_optima]
-    diferencia = abs(actual_idx - optima_idx)
-    if diferencia == 0:
-        return "ÓPTIMA", 1.0
-    elif diferencia == 1:
-        return "ADECUADA", 0.8
-    elif diferencia == 2:
-        return "MODERADA", 0.6
-    elif diferencia == 3:
-        return "LIMITANTE", 0.4
-    else:
-        return "MUY LIMITANTE", 0.2
-
-def analizar_textura_suelo(gdf, cultivo, mes_analisis):
-    params_textura = TEXTURA_SUELO_OPTIMA[cultivo]
-    zonas_gdf = gdf.copy()
-    zonas_gdf['area_ha'] = 0.0
-    zonas_gdf['arena'] = 0.0
-    zonas_gdf['limo'] = 0.0
-    zonas_gdf['arcilla'] = 0.0
-    zonas_gdf['textura_suelo'] = "NO_DETERMINADA"
-    zonas_gdf['adecuacion_textura'] = 0.0
-    zonas_gdf['categoria_adecuacion'] = "NO_DETERMINADA"
-    zonas_gdf['capacidad_campo'] = 0.0
-    zonas_gdf['punto_marchitez'] = 0.0
-    zonas_gdf['agua_disponible'] = 0.0
-    zonas_gdf['densidad_aparente'] = 0.0
-    zonas_gdf['porosidad'] = 0.0
-    zonas_gdf['conductividad_hidraulica'] = 0.0
-    for idx, row in zonas_gdf.iterrows():
-        try:
-            area_ha = calcular_superficie(zonas_gdf.iloc[[idx]])
-            if hasattr(row.geometry, 'centroid'):
-                centroid = row.geometry.centroid
-            else:
-                centroid = row.geometry.representative_point()
-            seed_value = abs(hash(f"{centroid.x:.6f}_{centroid.y:.6f}_{cultivo}_textura")) % (2**32)
-            rng = np.random.RandomState(seed_value)
-            lat_norm = (centroid.y + 90) / 180 if centroid.y else 0.5
-            lon_norm = (centroid.x + 180) / 360 if centroid.x else 0.5
-            variabilidad_local = 0.15 + 0.7 * (lat_norm * lon_norm)
-            arena_optima = params_textura['arena_optima']
-            limo_optima = params_textura['limo_optima']
-            arcilla_optima = params_textura['arcilla_optima']
-            arena = max(5, min(95, rng.normal(arena_optima * (0.8 + 0.4 * variabilidad_local), arena_optima * 0.2)))
-            limo = max(5, min(95, rng.normal(limo_optima * (0.7 + 0.6 * variabilidad_local), limo_optima * 0.25)))
-            arcilla = max(5, min(95, rng.normal(arcilla_optima * (0.75 + 0.5 * variabilidad_local), arcilla_optima * 0.3)))
-            total = arena + limo + arcilla
-            arena = (arena / total) * 100
-            limo = (limo / total) * 100
-            arcilla = (arcilla / total) * 100
-            textura = clasificar_textura_suelo(arena, limo, arcilla)
-            categoria_adecuacion, puntaje_adecuacion = evaluar_adecuacion_textura(textura, cultivo)
-            materia_organica = max(1.0, min(8.0, rng.normal(3.0, 1.0)))
-            propiedades_fisicas = calcular_propiedades_fisicas_suelo(textura, materia_organica)
-            zonas_gdf.loc[idx, 'area_ha'] = area_ha
-            zonas_gdf.loc[idx, 'arena'] = arena
-            zonas_gdf.loc[idx, 'limo'] = limo
-            zonas_gdf.loc[idx, 'arcilla'] = arcilla
-            zonas_gdf.loc[idx, 'textura_suelo'] = textura
-            zonas_gdf.loc[idx, 'adecuacion_textura'] = puntaje_adecuacion
-            zonas_gdf.loc[idx, 'categoria_adecuacion'] = categoria_adecuacion
-            zonas_gdf.loc[idx, 'capacidad_campo'] = propiedades_fisicas['capacidad_campo']
-            zonas_gdf.loc[idx, 'punto_marchitez'] = propiedades_fisicas['punto_marchitez']
-            zonas_gdf.loc[idx, 'agua_disponible'] = propiedades_fisicas['agua_disponible']
-            zonas_gdf.loc[idx, 'densidad_aparente'] = propiedades_fisicas['densidad_aparente']
-            zonas_gdf.loc[idx, 'porosidad'] = propiedades_fisicas['porosidad']
-            zonas_gdf.loc[idx, 'conductividad_hidraulica'] = propiedades_fisicas['conductividad_hidraulica']
-        except:
-            zonas_gdf.loc[idx, 'area_ha'] = calcular_superficie(zonas_gdf.iloc[[idx]])
-            zonas_gdf.loc[idx, 'arena'] = params_textura['arena_optima']
-            zonas_gdf.loc[idx, 'limo'] = params_textura['limo_optima']
-            zonas_gdf.loc[idx, 'arcilla'] = params_textura['arcilla_optima']
-            zonas_gdf.loc[idx, 'textura_suelo'] = params_textura['textura_optima']
-            zonas_gdf.loc[idx, 'adecuacion_textura'] = 1.0
-            zonas_gdf.loc[idx, 'categoria_adecuacion'] = "ÓPTIMA"
-            propiedades_default = calcular_propiedades_fisicas_suelo(params_textura['textura_optima'], 3.0)
-            for prop, valor in propiedades_default.items():
-                zonas_gdf.loc[idx, prop] = valor
-    return zonas_gdf
-
 def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
     params = PARAMETROS_CULTIVOS[cultivo]
     zonas_gdf = gdf.copy()
@@ -585,16 +587,37 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
             p_optimo = params['FOSFORO']['optimo']
             k_optimo = params['POTASIO']['optimo']
             variabilidad_local = 0.2 + 0.6 * (lat_norm * lon_norm)
-            nitrogeno = max(0, rng.normal(n_optimo * (0.8 + 0.4 * variabilidad_local), n_optimo * 0.15))
-            fosforo = max(0, rng.normal(p_optimo * (0.7 + 0.6 * variabilidad_local), p_optimo * 0.2))
-            potasio = max(0, rng.normal(k_optimo * (0.75 + 0.5 * variabilidad_local), k_optimo * 0.18))
+            nitrogeno = max(0, rng.normal(
+                n_optimo * (0.8 + 0.4 * variabilidad_local), 
+                n_optimo * 0.15
+            ))
+            fosforo = max(0, rng.normal(
+                p_optimo * (0.7 + 0.6 * variabilidad_local),
+                p_optimo * 0.2
+            ))
+            potasio = max(0, rng.normal(
+                k_optimo * (0.75 + 0.5 * variabilidad_local),
+                k_optimo * 0.18
+            ))
             nitrogeno *= factor_n_mes * (0.9 + 0.2 * rng.random())
             fosforo *= factor_p_mes * (0.9 + 0.2 * rng.random())
             potasio *= factor_k_mes * (0.9 + 0.2 * rng.random())
-            materia_organica = max(1.0, min(8.0, rng.normal(params['MATERIA_ORGANICA_OPTIMA'], 1.0)))
-            humedad = max(0.1, min(0.8, rng.normal(params['HUMEDAD_OPTIMA'], 0.1)))
-            ph = max(4.0, min(8.0, rng.normal(params['pH_OPTIMO'], 0.5)))
-            conductividad = max(0.1, min(3.0, rng.normal(params['CONDUCTIVIDAD_OPTIMA'], 0.3)))
+            materia_organica = max(1.0, min(8.0, rng.normal(
+                params['MATERIA_ORGANICA_OPTIMA'], 
+                1.0
+            )))
+            humedad = max(0.1, min(0.8, rng.normal(
+                params['HUMEDAD_OPTIMA'],
+                0.1
+            )))
+            ph = max(4.0, min(8.0, rng.normal(
+                params['pH_OPTIMO'],
+                0.5
+            )))
+            conductividad = max(0.1, min(3.0, rng.normal(
+                params['CONDUCTIVIDAD_OPTIMA'],
+                0.3
+            )))
             base_ndvi = 0.3 + 0.5 * variabilidad_local
             ndvi = max(0.1, min(0.95, rng.normal(base_ndvi, 0.1)))
             n_norm = max(0, min(1, nitrogeno / (n_optimo * 1.5)))
@@ -602,7 +625,14 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
             k_norm = max(0, min(1, potasio / (k_optimo * 1.5)))
             mo_norm = max(0, min(1, materia_organica / 8.0))
             ph_norm = max(0, min(1, 1 - abs(ph - params['pH_OPTIMO']) / 2.0))
-            indice_fertilidad = (n_norm * 0.25 + p_norm * 0.20 + k_norm * 0.20 + mo_norm * 0.15 + ph_norm * 0.10 + ndvi * 0.10) * factor_mes
+            indice_fertilidad = (
+                n_norm * 0.25 + 
+                p_norm * 0.20 + 
+                k_norm * 0.20 + 
+                mo_norm * 0.15 +
+                ph_norm * 0.10 +
+                ndvi * 0.10
+            ) * factor_mes
             indice_fertilidad = max(0, min(1, indice_fertilidad))
             if indice_fertilidad >= 0.85:
                 categoria = "EXCELENTE"
@@ -629,7 +659,8 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
                     factor_crecimiento = 1.2
                     factor_materia_organica = max(0.7, 1.0 - (materia_organica / 15.0))
                     factor_ndvi = 1.0 + (0.5 - ndvi) * 0.4
-                    recomendacion = (deficit_nitrogeno * factor_eficiencia * factor_crecimiento * factor_materia_organica * factor_ndvi)
+                    recomendacion = (deficit_nitrogeno * factor_eficiencia * factor_crecimiento * 
+                                   factor_materia_organica * factor_ndvi)
                     recomendacion = min(recomendacion, 250)
                     recomendacion = max(20, recomendacion)
                     deficit = deficit_nitrogeno
@@ -640,7 +671,8 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
                     if ph < 5.5 or ph > 7.5:
                         factor_ph = 1.3
                     factor_materia_organica = 1.1
-                    recomendacion = (deficit_fosforo * factor_eficiencia * factor_ph * factor_materia_organica)
+                    recomendacion = (deficit_fosforo * factor_eficiencia * 
+                                   factor_ph * factor_materia_organica)
                     recomendacion = min(recomendacion, 120)
                     recomendacion = max(10, recomendacion)
                     deficit = deficit_fosforo
@@ -651,7 +683,8 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
                     if materia_organica < 2.0:
                         factor_textura = 1.2
                     factor_rendimiento = 1.0 + (0.5 - ndvi) * 0.3
-                    recomendacion = (deficit_potasio * factor_eficiencia * factor_textura * factor_rendimiento)
+                    recomendacion = (deficit_potasio * factor_eficiencia * 
+                                   factor_textura * factor_rendimiento)
                     recomendacion = min(recomendacion, 200)
                     recomendacion = max(15, recomendacion)
                     deficit = deficit_potasio
@@ -677,7 +710,8 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
             zonas_gdf.loc[idx, 'deficit_npk'] = deficit
             zonas_gdf.loc[idx, 'prioridad'] = prioridad
         except:
-            zonas_gdf.loc[idx, 'area_ha'] = calcular_superficie(zonas_gdf.iloc[[idx]])
+            area_ha = calcular_superficie(zonas_gdf.iloc[[idx]])
+            zonas_gdf.loc[idx, 'area_ha'] = area_ha
             zonas_gdf.loc[idx, 'nitrogeno'] = params['NITROGENO']['optimo'] * 0.8
             zonas_gdf.loc[idx, 'fosforo'] = params['FOSFORO']['optimo'] * 0.8
             zonas_gdf.loc[idx, 'potasio'] = params['POTASIO']['optimo'] * 0.8
@@ -693,9 +727,9 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
             zonas_gdf.loc[idx, 'prioridad'] = "MEDIA"
     return zonas_gdf
 
-# ==============================================================================
+# ============================================================================
 # FUNCIONES DE VISUALIZACIÓN
-# ==============================================================================
+# ============================================================================
 
 def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, nutriente=None):
     centroid = gdf.geometry.centroid.iloc[0]
@@ -978,9 +1012,9 @@ def crear_mapa_estatico(gdf, titulo, columna_valor=None, analisis_tipo=None, nut
         st.error(f"Error creando mapa estático: {str(e)}")
         return None
 
-# ==============================================================================
+# ============================================================================
 # FUNCIONES DE INTERFAZ Y RECOMENDACIONES
-# ==============================================================================
+# ============================================================================
 
 def mostrar_recomendaciones_agroecologicas(cultivo, categoria, area_ha, analisis_tipo, nutriente=None, textura_data=None):
     st.markdown("### 🌿 RECOMENDACIONES AGROECOLÓGICAS")
@@ -1217,7 +1251,7 @@ def generar_informe_pdf(gdf_analisis, cultivo, analisis_tipo, nutriente, mes_ana
             story.append(img)
             story.append(Spacer(1, 10))
             story.append(Paragraph(f"Figura 1: {titulo_mapa}", normal_style))
-        except:
+        except Exception as e:
             story.append(Paragraph("Error al generar el mapa para el PDF", normal_style))
     story.append(Spacer(1, 20))
     story.append(Paragraph("RESULTADOS POR ZONA (PRIMERAS 10 ZONAS)", heading_style))
@@ -1625,7 +1659,7 @@ def mostrar_configuracion_parcela():
     cultivo = st.session_state.cultivo
     n_divisiones = st.session_state.n_divisiones
     area_total = calcular_superficie(gdf_original)
-    num_poligonos = len(gdf_original)
+    num_poligonos = len(gdf_original) if gdf_original is not None else 0
     st.success("✅ Parcela cargada correctamente")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1662,6 +1696,31 @@ def mostrar_configuracion_parcela():
                     st.session_state.analisis_textura = gdf_textura
             st.session_state.area_total = area_total
             st.session_state.analisis_completado = True
+        st.rerun()
+
+# ============================================================================
+# SIDEBAR
+# ============================================================================
+with st.sidebar:
+    st.header("⚙️ Configuración")
+    st.session_state.cultivo = st.selectbox("Cultivo:", 
+                          ["PALMA_ACEITERA", "CACAO", "BANANO"])
+    st.session_state.analisis_tipo = st.selectbox("Tipo de Análisis:", 
+                               ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK", "ANÁLISIS DE TEXTURA"])
+    st.session_state.nutriente = st.selectbox("Nutriente:", ["NITRÓGENO", "FÓSFORO", "POTASIO"])
+    st.session_state.mes_analisis = st.selectbox("Mes de Análisis:", 
+                               ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+                                "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"])
+    st.session_state.n_divisiones = st.slider("Número de zonas de manejo:", min_value=16, max_value=32, value=24)
+    st.subheader("📤 Subir Parcela")
+    uploaded_file = st.file_uploader("Subir ZIP con shapefile o archivo KML de tu parcela", type=['zip', 'kml'])
+    if st.button("🔄 Reiniciar Análisis"):
+        st.session_state.analisis_completado = False
+        st.session_state.gdf_original = None
+        st.session_state.gdf_analisis = None
+        st.session_state.analisis_textura = None
+        st.session_state.area_total = 0.0
+        st.session_state.datos_demo = False
         st.rerun()
 
 # ============================================================================
