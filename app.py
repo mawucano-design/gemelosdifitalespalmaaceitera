@@ -63,6 +63,184 @@ PARAMETROS_CULTIVOS = {
     }
 }
 
+# PARÁMETROS DE TEXTURA DEL SUELO
+TEXTURA_SUELO_OPTIMA = {
+    'PALMA_ACEITERA': {
+        'textura_optima': 'Franco Arcilloso',
+        'arena_optima': 40,
+        'limo_optima': 30,
+        'arcilla_optima': 30,
+        'densidad_aparente_optima': 1.3,
+        'porosidad_optima': 0.5
+    },
+    'CACAO': {
+        'textura_optima': 'Franco',
+        'arena_optima': 45,
+        'limo_optima': 35,
+        'arcilla_optima': 20,
+        'densidad_aparente_optima': 1.2,
+        'porosidad_optima': 0.55
+    },
+    'BANANO': {
+        'textura_optima': 'Franco Arcilloso-Arenoso',
+        'arena_optima': 50,
+        'limo_optima': 30,
+        'arcilla_optima': 20,
+        'densidad_aparente_optima': 1.25,
+        'porosidad_optima': 0.52
+    }
+}
+
+# FACTORES ESTACIONALES
+FACTORES_MES = {
+    "ENERO": 0.9, "FEBRERO": 0.95, "MARZO": 1.0, "ABRIL": 1.05,
+    "MAYO": 1.1, "JUNIO": 1.0, "JULIO": 0.95, "AGOSTO": 0.9,
+    "SEPTIEMBRE": 0.95, "OCTUBRE": 1.0, "NOVIEMBRE": 1.05, "DICIEMBRE": 1.0
+}
+FACTORES_N_MES = {
+    "ENERO": 1.0, "FEBRERO": 1.05, "MARZO": 1.1, "ABRIL": 1.15,
+    "MAYO": 1.2, "JUNIO": 1.1, "JULIO": 1.0, "AGOSTO": 0.9,
+    "SEPTIEMBRE": 0.95, "OCTUBRE": 1.0, "NOVIEMBRE": 1.05, "DICIEMBRE": 1.0
+}
+FACTORES_P_MES = {
+    "ENERO": 1.0, "FEBRERO": 1.0, "MARZO": 1.05, "ABRIL": 1.1,
+    "MAYO": 1.15, "JUNIO": 1.1, "JULIO": 1.05, "AGOSTO": 1.0,
+    "SEPTIEMBRE": 1.0, "OCTUBRE": 1.05, "NOVIEMBRE": 1.1, "DICIEMBRE": 1.05
+}
+FACTORES_K_MES = {
+    "ENERO": 1.0, "FEBRERO": 1.0, "MARZO": 1.0, "ABRIL": 1.05,
+    "MAYO": 1.1, "JUNIO": 1.15, "JULIO": 1.2, "AGOSTO": 1.15,
+    "SEPTIEMBRE": 1.1, "OCTUBRE": 1.05, "NOVIEMBRE": 1.0, "DICIEMBRE": 1.0
+}
+
+# PALETAS
+PALETAS_GEE = {
+    'FERTILIDAD': ['#d73027', '#f46d43', '#fdae61', '#fee08b', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850', '#006837'],
+    'NITROGENO': ['#8c510a', '#bf812d', '#dfc27d', '#f6e8c3', '#c7eae5', '#80cdc1', '#35978f', '#01665e'],
+    'FOSFORO': ['#67001f', '#b2182b', '#d6604d', '#f4a582', '#fddbc7', '#d1e5f0', '#92c5de', '#4393c3', '#2166ac', '#053061'],
+    'POTASIO': ['#4d004b', '#810f7c', '#8c6bb1', '#8c96c6', '#9ebcda', '#bfd3e6', '#e0ecf4', '#edf8fb'],
+    'TEXTURA': ['#8c510a', '#d8b365', '#f6e8c3', '#c7eae5', '#5ab4ac', '#01665e'],
+    'POTENCIAL': ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b']
+}
+
+# RECOMENDACIONES
+RECOMENDACIONES_TEXTURA = {
+    'Arcilloso': [
+        "Añadir materia orgánica para mejorar estructura",
+        "Evitar laboreo en condiciones húmedas",
+        "Implementar drenajes superficiales",
+        "Usar cultivos de cobertura para romper compactación"
+    ],
+    'Franco Arcilloso': [
+        "Mantener niveles adecuados de materia orgánica",
+        "Rotación de cultivos para mantener estructura",
+        "Laboreo mínimo conservacionista",
+        "Aplicación moderada de enmiendas"
+    ],
+    'Franco': [
+        "Textura ideal - mantener prácticas conservacionistas",
+        "Rotación balanceada de cultivos",
+        "Manejo integrado de nutrientes",
+        "Conservar estructura con coberturas"
+    ],
+    'Franco Arcilloso-Arenoso': [
+        "Aplicación frecuente de materia orgánica",
+        "Riego por goteo para eficiencia hídrica",
+        "Fertilización fraccionada para reducir pérdidas",
+        "Cultivos de cobertura para retener humedad"
+    ],
+    'Arenoso': [
+        "Altas dosis de materia orgánica y compost",
+        "Sistema de riego por goteo con alta frecuencia",
+        "Fertilización en múltiples aplicaciones",
+        "Barreras vivas para reducir erosión"
+    ]
+}
+
+RECOMENDACIONES_AGROECOLOGICAS = {
+    'PALMA_ACEITERA': {
+        'COBERTURAS_VIVAS': [
+            "Leguminosas: Centrosema pubescens, Pueraria phaseoloides",
+            "Coberturas mixtas: Maní forrajero (Arachis pintoi)",
+            "Plantas de cobertura baja: Dichondra repens"
+        ],
+        'ABONOS_VERDES': [
+            "Crotalaria juncea: 3-4 kg/ha antes de la siembra",
+            "Mucuna pruriens: 2-3 kg/ha para control de malezas",
+            "Canavalia ensiformis: Fijación de nitrógeno"
+        ],
+        'BIOFERTILIZANTES': [
+            "Bocashi: 2-3 ton/ha cada 6 meses",
+            "Compost de racimo vacío: 1-2 ton/ha",
+            "Biofertilizante líquido: Aplicación foliar mensual"
+        ],
+        'MANEJO_ECOLOGICO': [
+            "Uso de trampas amarillas para insectos",
+            "Cultivos trampa: Maíz alrededor de la plantación",
+            "Conservación de enemigos naturales"
+        ],
+        'ASOCIACIONES': [
+            "Piña en calles durante primeros 2 años",
+            "Yuca en calles durante establecimiento",
+            "Leguminosas arbustivas como cercas vivas"
+        ]
+    },
+    'CACAO': {
+        'COBERTURAS_VIVAS': [
+            "Leguminosas rastreras: Arachis pintoi",
+            "Coberturas sombreadas: Erythrina poeppigiana",
+            "Plantas aromáticas: Lippia alba para control plagas"
+        ],
+        'ABONOS_VERDES': [
+            "Frijol terciopelo (Mucuna pruriens): 3 kg/ha",
+            "Guandul (Cajanus cajan): Podas periódicas",
+            "Crotalaria: Control de nematodos"
+        ],
+        'BIOFERTILIZANTES': [
+            "Compost de cacaoteca: 3-4 ton/ha",
+            "Bocashi especial cacao: 2 ton/ha",
+            "Té de compost aplicado al suelo"
+        ],
+        'MANEJO_ECOLOGICO': [
+            "Sistema agroforestal multiestrato",
+            "Manejo de sombra regulada (30-50%)",
+            "Control biológico con hongos entomopatógenos"
+        ],
+        'ASOCIACIONES': [
+            "Árboles maderables: Cedro, Caoba",
+            "Frutales: Cítricos, Aguacate",
+            "Plantas medicinales: Jengibre, Cúrcuma"
+        ]
+    },
+    'BANANO': {
+        'COBERTURAS_VIVAS': [
+            "Arachis pintoi entre calles",
+            "Leguminosas de porte bajo",
+            "Coberturas para control de malas hierbas"
+        ],
+        'ABONOS_VERDES': [
+            "Mucuna pruriens: 4 kg/ha entre ciclos",
+            "Canavalia ensiformis: Fijación de N",
+            "Crotalaria spectabilis: Control nematodos"
+        ],
+        'BIOFERTILIZANTES': [
+            "Compost de pseudotallo: 4-5 ton/ha",
+            "Bocashi bananero: 3 ton/ha",
+            "Biofertilizante a base de micorrizas"
+        ],
+        'MANEJO_ECOLOGICO': [
+            "Trampas cromáticas para picudos",
+            "Barreras vivas con citronela",
+            "Uso de trichoderma para control enfermedades"
+        ],
+        'ASOCIACIONES': [
+            "Leguminosas arbustivas en linderos",
+            "Cítricos como cortavientos",
+            "Plantas repelentes: Albahaca, Menta"
+        ]
+    }
+}
+
 # ============================================================================
 # FUNCIONES DE DATOS CLIMÁTICOS Y PLANETSCOPE
 # ============================================================================
@@ -70,7 +248,6 @@ PARAMETROS_CULTIVOS = {
 def obtener_datos_nasa_power(lat, lon, mes_analisis):
     """Obtiene datos climáticos de NASA POWER"""
     try:
-        # Mapear mes a número
         mes_num = {
             "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5, "JUNIO": 6,
             "JULIO": 7, "AGOSTO": 8, "SEPTIEMBRE": 9, "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
@@ -105,25 +282,18 @@ def obtener_datos_nasa_power(lat, lon, mes_analisis):
                 'velocidad_viento': float(viento) if not np.isnan(viento) else 2.5
             }
     except:
-        # Valores por defecto (Colombia promedio)
         return {
-            'radiacion_solar': 16.0,  # MJ/m²/día
-            'precipitacion': 6.0,     # mm/día
-            'velocidad_viento': 2.5   # m/s
+            'radiacion_solar': 16.0,
+            'precipitacion': 6.0,
+            'velocidad_viento': 2.5
         }
 
 def obtener_datos_planetscope(lat, lon, api_key=None):
     """Obtiene o simula datos de PlanetScope"""
-    if api_key:
-        # Aquí iría la integración real con Planet API
-        # Por ahora, simulamos datos realistas
-        pass
-    
-    # Simular datos basados en coordenadas (zonas tropicales)
     np.random.seed(abs(hash(f"{lat:.4f}_{lon:.4f}")) % (2**32))
     ndvi = np.clip(0.6 + np.random.normal(0, 0.1), 0.3, 0.9)
     evi = np.clip(0.4 + np.random.normal(0, 0.08), 0.2, 0.7)
-    lai = np.clip(4.0 + np.random.normal(0, 0.8), 1.0, 8.0)  # Leaf Area Index
+    lai = np.clip(4.0 + np.random.normal(0, 0.8), 1.0, 8.0)
     
     return {
         'ndvi_planetscope': ndvi,
@@ -137,24 +307,18 @@ def calcular_potencial_cosecha(gdf_analisis, datos_clima, datos_planetscope, cul
         gdf_analisis['potencial_cosecha'] = 0.0
         return gdf_analisis
     
-    # Factores climáticos
     rad_solar = datos_clima['radiacion_solar']
     precip_mensual = datos_clima['precipitacion'] * 30
     viento = datos_clima['velocidad_viento']
+    ndvi = datos_planetscope['ndvi_planetscope']
     
     factor_rad = min(1.0, rad_solar / 20.0)
     factor_agua = min(1.0, precip_mensual / 200.0)
     factor_viento = max(0.7, 1.0 - (viento - 2.0) / 10.0)
-    
-    # Factor de satélite (NDVI mejora la fotosíntesis)
-    ndvi = datos_planetscope['ndvi_planetscope']
     factor_ndvi = min(1.0, ndvi / 0.8)
-    
-    # Potencial base (ton/ha/año)
-    potencial_base = 25.0
     factor_suelo = gdf_analisis['indice_fertilidad']
     
-    # Cálculo final
+    potencial_base = 25.0
     gdf_analisis['potencial_cosecha'] = (
         potencial_base * 
         factor_suelo * 
@@ -164,7 +328,6 @@ def calcular_potencial_cosecha(gdf_analisis, datos_clima, datos_planetscope, cul
         factor_ndvi
     )
     
-    # Añadir datos climáticos y de satélite
     for key, value in datos_clima.items():
         gdf_analisis[key] = value
     for key, value in datos_planetscope.items():
@@ -173,117 +336,10 @@ def calcular_potencial_cosecha(gdf_analisis, datos_clima, datos_planetscope, cul
     return gdf_analisis
 
 # ============================================================================
-# RESTO DE FUNCIONES (TEXTURA, FERTILIDAD, MAPAS, ETC.)
-# ============================================================================
-
-# [Mantén todas las funciones que ya tienes: calcular_superficie, procesar_archivo, 
-#  clasificar_textura_suelo, analizar_textura_suelo, dividir_parcela_en_zonas, 
-#  calcular_indices_gee, crear_mapa_interactivo, crear_mapa_visualizador_parcela, 
-#  crear_mapa_estatico, mostrar_recomendaciones_agroecologicas, generar_informe_pdf, 
-#  mostrar_resultados_textura, mostrar_resultados_principales, mostrar_modo_demo, 
-#  mostrar_configuracion_parcela]
-
-# Por brevedad, aquí resumimos solo las partes nuevas relacionadas con PlanetScope y cosecha
-
-def mostrar_potencial_cosecha():
-    """Muestra resultados de potencial de cosecha"""
-    if 'gdf_analisis' not in st.session_state or st.session_state.gdf_analisis is None:
-        st.warning("No hay datos de análisis disponibles")
-        return
-        
-    gdf = st.session_state.gdf_analisis
-    clima = st.session_state.get('datos_clima', {})
-    planetscope = st.session_state.get('datos_planetscope', {})
-    
-    st.markdown("## 🌴 POTENCIAL DE COSECHA - PALMA ACEITERA")
-    
-    # Resumen de datos
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("☀️ Radiación Solar", f"{clima.get('radiacion_solar', 0):.1f} MJ/m²/día")
-    with col2:
-        st.metric("🌧️ Precipitación", f"{clima.get('precipitacion', 0)*30:.0f} mm/mes")
-    with col3:
-        st.metric("💨 Viento", f"{clima.get('velocidad_viento', 0):.1f} m/s")
-    with col4:
-        st.metric("🛰️ NDVI (PlanetScope)", f"{planetscope.get('ndvi_planetscope', 0):.2f}")
-    
-    # Potencial promedio
-    potencial_prom = gdf['potencial_cosecha'].mean()
-    st.metric("📦 Potencial Cosecha Promedio", f"{potencial_prom:.1f} ton/ha/año")
-    
-    # Mapa de potencial
-    st.subheader("🗺️ Mapa de Potencial de Cosecha")
-    mapa_potencial = crear_mapa_interactivo(
-        gdf, 
-        "Potencial de Cosecha - Palma Aceitera", 
-        'potencial_cosecha', 
-        "POTENCIAL_COSECHA", 
-        "PALMA"
-    )
-    st_folium(mapa_potencial, width=800, height=500)
-    
-    # Tabla detallada
-    st.subheader("📋 Datos por Zona")
-    columnas_cosecha = ['id_zona', 'potencial_cosecha', 'indice_fertilidad', 
-                       'radiacion_solar', 'precipitacion_mm_mes', 'velocidad_viento', 'ndvi_planetscope']
-    df_cosecha = gdf[columnas_cosecha].copy()
-    df_cosecha['precipitacion_mm_mes'] = df_cosecha['precipitacion'] * 30
-    st.dataframe(df_cosecha.round(2), use_container_width=True)
-    
-    # Recomendaciones basadas en cosecha
-    st.markdown("### 📈 Recomendaciones para Maximizar Cosecha")
-    if potencial_prom < 15:
-        st.error("🚨 **BAJO POTENCIAL**: Considerar mejoras en riego, nutrición o manejo de sombra")
-    elif potencial_prom < 20:
-        st.warning("⚠️ **POTENCIAL MODERADO**: Optimizar fertilización y control de malezas")
-    else:
-        st.success("✅ **ALTO POTENCIAL**: Mantener prácticas actuales y monitorear continuamente")
-    
-    st.markdown("""
-    **Factores críticos para palma aceitera:**
-    - Radiación solar > 15 MJ/m²/día
-    - Precipitación mensual > 150 mm
-    - NDVI > 0.7 (buena cobertura vegetal)
-    - Fertilidad del suelo óptima (NPK balanceado)
-    """)
-
-# ============================================================================
-# INICIALIZACIÓN DE SESSION_STATE
-# ============================================================================
-if 'analisis_completado' not in st.session_state:
-    st.session_state.analisis_completado = False
-if 'gdf_original' not in st.session_state:
-    st.session_state.gdf_original = None
-if 'gdf_analisis' not in st.session_state:
-    st.session_state.gdf_analisis = None
-if 'analisis_textura' not in st.session_state:
-    st.session_state.analisis_textura = None
-if 'area_total' not in st.session_state:
-    st.session_state.area_total = 0.0
-if 'datos_demo' not in st.session_state:
-    st.session_state.datos_demo = False
-if 'cultivo' not in st.session_state:
-    st.session_state.cultivo = "PALMA_ACEITERA"
-if 'analisis_tipo' not in st.session_state:
-    st.session_state.analisis_tipo = "FERTILIDAD ACTUAL"
-if 'nutriente' not in st.session_state:
-    st.session_state.nutriente = "NITRÓGENO"
-if 'mes_analisis' not in st.session_state:
-    st.session_state.mes_analisis = "ENERO"
-if 'n_divisiones' not in st.session_state:
-    st.session_state.n_divisiones = 24
-if 'datos_clima' not in st.session_state:
-    st.session_state.datos_clima = None
-if 'datos_planetscope' not in st.session_state:
-    st.session_state.datos_planetscope = None
-
-# ============================================================================
-# FUNCIONES AUXILIARES COMPLETAS (incluyendo las que faltaban)
+# FUNCIONES AUXILIARES
 # ============================================================================
 
 def calcular_superficie(gdf):
-    """Calcula superficie en hectáreas con manejo robusto de CRS"""
     try:
         if gdf is None or gdf.empty or gdf.geometry.isnull().all():
             return 0.0
@@ -305,7 +361,6 @@ def calcular_superficie(gdf):
         return 0.0
 
 def procesar_archivo(uploaded_file):
-    """Procesa el archivo ZIP con shapefile o archivo KML"""
     try:
         with tempfile.TemporaryDirectory() as tmp_dir:
             file_path = os.path.join(tmp_dir, uploaded_file.name)
@@ -721,68 +776,8 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
             zonas_gdf.loc[idx, 'prioridad'] = "MEDIA"
     return zonas_gdf
 
-# PARÁMETROS DE TEXTURA DEL SUELO
-TEXTURA_SUELO_OPTIMA = {
-    'PALMA_ACEITERA': {
-        'textura_optima': 'Franco Arcilloso',
-        'arena_optima': 40,
-        'limo_optima': 30,
-        'arcilla_optima': 30,
-        'densidad_aparente_optima': 1.3,
-        'porosidad_optima': 0.5
-    },
-    'CACAO': {
-        'textura_optima': 'Franco',
-        'arena_optima': 45,
-        'limo_optima': 35,
-        'arcilla_optima': 20,
-        'densidad_aparente_optima': 1.2,
-        'porosidad_optima': 0.55
-    },
-    'BANANO': {
-        'textura_optima': 'Franco Arcilloso-Arenoso',
-        'arena_optima': 50,
-        'limo_optima': 30,
-        'arcilla_optima': 20,
-        'densidad_aparente_optima': 1.25,
-        'porosidad_optima': 0.52
-    }
-}
-
-# FACTORES ESTACIONALES
-FACTORES_MES = {
-    "ENERO": 0.9, "FEBRERO": 0.95, "MARZO": 1.0, "ABRIL": 1.05,
-    "MAYO": 1.1, "JUNIO": 1.0, "JULIO": 0.95, "AGOSTO": 0.9,
-    "SEPTIEMBRE": 0.95, "OCTUBRE": 1.0, "NOVIEMBRE": 1.05, "DICIEMBRE": 1.0
-}
-FACTORES_N_MES = {
-    "ENERO": 1.0, "FEBRERO": 1.05, "MARZO": 1.1, "ABRIL": 1.15,
-    "MAYO": 1.2, "JUNIO": 1.1, "JULIO": 1.0, "AGOSTO": 0.9,
-    "SEPTIEMBRE": 0.95, "OCTUBRE": 1.0, "NOVIEMBRE": 1.05, "DICIEMBRE": 1.0
-}
-FACTORES_P_MES = {
-    "ENERO": 1.0, "FEBRERO": 1.0, "MARZO": 1.05, "ABRIL": 1.1,
-    "MAYO": 1.15, "JUNIO": 1.1, "JULIO": 1.05, "AGOSTO": 1.0,
-    "SEPTIEMBRE": 1.0, "OCTUBRE": 1.05, "NOVIEMBRE": 1.1, "DICIEMBRE": 1.05
-}
-FACTORES_K_MES = {
-    "ENERO": 1.0, "FEBRERO": 1.0, "MARZO": 1.0, "ABRIL": 1.05,
-    "MAYO": 1.1, "JUNIO": 1.15, "JULIO": 1.2, "AGOSTO": 1.15,
-    "SEPTIEMBRE": 1.1, "OCTUBRE": 1.05, "NOVIEMBRE": 1.0, "DICIEMBRE": 1.0
-}
-
-# PALETAS
-PALETAS_GEE = {
-    'FERTILIDAD': ['#d73027', '#f46d43', '#fdae61', '#fee08b', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850', '#006837'],
-    'NITROGENO': ['#8c510a', '#bf812d', '#dfc27d', '#f6e8c3', '#c7eae5', '#80cdc1', '#35978f', '#01665e'],
-    'FOSFORO': ['#67001f', '#b2182b', '#d6604d', '#f4a582', '#fddbc7', '#d1e5f0', '#92c5de', '#4393c3', '#2166ac', '#053061'],
-    'POTASIO': ['#4d004b', '#810f7c', '#8c6bb1', '#8c96c6', '#9ebcda', '#bfd3e6', '#e0ecf4', '#edf8fb'],
-    'TEXTURA': ['#8c510a', '#d8b365', '#f6e8c3', '#c7eae5', '#5ab4ac', '#01665e'],
-    'POTENCIAL': ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b']
-}
-
 # ============================================================================
-# FUNCIONES DE VISUALIZACIÓN ACTUALIZADAS
+# FUNCIONES DE VISUALIZACIÓN
 # ============================================================================
 
 def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, nutriente=None):
@@ -859,7 +854,6 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
                 else:
                     valor_display = f"{valor:.1f}"
                     
-            # Popup según tipo
             if analisis_tipo == "POTENCIAL_COSECHA":
                 popup_text = f"""
                 <div style="font-family: Arial; font-size: 12px;">
@@ -1101,129 +1095,12 @@ def crear_mapa_estatico(gdf, titulo, columna_valor=None, analisis_tipo=None, nut
         return None
 
 # ============================================================================
-# FUNCIONES DE RECOMENDACIONES Y DEMÁS (resumidas por brevedad)
+# FUNCIONES DE INTERFAZ Y RECOMENDACIONES
 # ============================================================================
-
-RECOMENDACIONES_TEXTURA = {
-    'Arcilloso': [
-        "Añadir materia orgánica para mejorar estructura",
-        "Evitar laboreo en condiciones húmedas",
-        "Implementar drenajes superficiales",
-        "Usar cultivos de cobertura para romper compactación"
-    ],
-    'Franco Arcilloso': [
-        "Mantener niveles adecuados de materia orgánica",
-        "Rotación de cultivos para mantener estructura",
-        "Laboreo mínimo conservacionista",
-        "Aplicación moderada de enmiendas"
-    ],
-    'Franco': [
-        "Textura ideal - mantener prácticas conservacionistas",
-        "Rotación balanceada de cultivos",
-        "Manejo integrado de nutrientes",
-        "Conservar estructura con coberturas"
-    ],
-    'Franco Arcilloso-Arenoso': [
-        "Aplicación frecuente de materia orgánica",
-        "Riego por goteo para eficiencia hídrica",
-        "Fertilización fraccionada para reducir pérdidas",
-        "Cultivos de cobertura para retener humedad"
-    ],
-    'Arenoso': [
-        "Altas dosis de materia orgánica y compost",
-        "Sistema de riego por goteo con alta frecuencia",
-        "Fertilización en múltiples aplicaciones",
-        "Barreras vivas para reducir erosión"
-    ]
-}
-
-RECOMENDACIONES_AGROECOLOGICAS = {
-    'PALMA_ACEITERA': {
-        'COBERTURAS_VIVAS': [
-            "Leguminosas: Centrosema pubescens, Pueraria phaseoloides",
-            "Coberturas mixtas: Maní forrajero (Arachis pintoi)",
-            "Plantas de cobertura baja: Dichondra repens"
-        ],
-        'ABONOS_VERDES': [
-            "Crotalaria juncea: 3-4 kg/ha antes de la siembra",
-            "Mucuna pruriens: 2-3 kg/ha para control de malezas",
-            "Canavalia ensiformis: Fijación de nitrógeno"
-        ],
-        'BIOFERTILIZANTES': [
-            "Bocashi: 2-3 ton/ha cada 6 meses",
-            "Compost de racimo vacío: 1-2 ton/ha",
-            "Biofertilizante líquido: Aplicación foliar mensual"
-        ],
-        'MANEJO_ECOLOGICO': [
-            "Uso de trampas amarillas para insectos",
-            "Cultivos trampa: Maíz alrededor de la plantación",
-            "Conservación de enemigos naturales"
-        ],
-        'ASOCIACIONES': [
-            "Piña en calles durante primeros 2 años",
-            "Yuca en calles durante establecimiento",
-            "Leguminosas arbustivas como cercas vivas"
-        ]
-    },
-    'CACAO': {
-        'COBERTURAS_VIVAS': [
-            "Leguminosas rastreras: Arachis pintoi",
-            "Coberturas sombreadas: Erythrina poeppigiana",
-            "Plantas aromáticas: Lippia alba para control plagas"
-        ],
-        'ABONOS_VERDES': [
-            "Frijol terciopelo (Mucuna pruriens): 3 kg/ha",
-            "Guandul (Cajanus cajan): Podas periódicas",
-            "Crotalaria: Control de nematodos"
-        ],
-        'BIOFERTILIZANTES': [
-            "Compost de cacaoteca: 3-4 ton/ha",
-            "Bocashi especial cacao: 2 ton/ha",
-            "Té de compost aplicado al suelo"
-        ],
-        'MANEJO_ECOLOGICO': [
-            "Sistema agroforestal multiestrato",
-            "Manejo de sombra regulada (30-50%)",
-            "Control biológico con hongos entomopatógenos"
-        ],
-        'ASOCIACIONES': [
-            "Árboles maderables: Cedro, Caoba",
-            "Frutales: Cítricos, Aguacate",
-            "Plantas medicinales: Jengibre, Cúrcuma"
-        ]
-    },
-    'BANANO': {
-        'COBERTURAS_VIVAS': [
-            "Arachis pintoi entre calles",
-            "Leguminosas de porte bajo",
-            "Coberturas para control de malas hierbas"
-        ],
-        'ABONOS_VERDES': [
-            "Mucuna pruriens: 4 kg/ha entre ciclos",
-            "Canavalia ensiformis: Fijación de N",
-            "Crotalaria spectabilis: Control nematodos"
-        ],
-        'BIOFERTILIZANTES': [
-            "Compost de pseudotallo: 4-5 ton/ha",
-            "Bocashi bananero: 3 ton/ha",
-            "Biofertilizante a base de micorrizas"
-        ],
-        'MANEJO_ECOLOGICO': [
-            "Trampas cromáticas para picudos",
-            "Barreras vivas con citronela",
-            "Uso de trichoderma para control enfermedades"
-        ],
-        'ASOCIACIONES': [
-            "Leguminosas arbustivas en linderos",
-            "Cítricos como cortavientos",
-            "Plantas repelentes: Albahaca, Menta"
-        ]
-    }
-}
 
 def mostrar_recomendaciones_agroecologicas(cultivo, categoria, area_ha, analisis_tipo, nutriente=None, textura_data=None):
     st.markdown("### 🌿 RECOMENDACIONES AGROECOLÓGICAS")
-    if analisis_tipo == "ANÁLISIS DE TEXTURA" and textura_
+    if analisis_tipo == "ANÁLISIS DE TEXTURA" and textura_data is not None:
         adecuacion_promedio = textura_data.get('adecuacion_promedio', 0.5)
         textura_predominante = textura_data.get('textura_predominante', 'Franco')
         if adecuacion_promedio >= 0.8:
@@ -1295,9 +1172,6 @@ def mostrar_recomendaciones_agroecologicas(cultivo, categoria, area_ha, analisis
         • Optimiza el uso de recursos (agua, luz, nutrientes)
         • Incrementa la resiliencia del sistema
         """)
-
-# [Las funciones generar_informe_pdf, mostrar_resultados_textura, mostrar_resultados_principales, 
-#  mostrar_modo_demo, mostrar_configuracion_parcela se mantienen igual - omitidas por brevedad]
 
 def generar_informe_pdf(gdf_analisis, cultivo, analisis_tipo, nutriente, mes_analisis, area_total, gdf_textura=None):
     buffer = io.BytesIO()
@@ -1838,6 +1712,64 @@ def mostrar_resultados_principales():
                     mime="application/pdf"
                 )
 
+def mostrar_potencial_cosecha():
+    """Muestra resultados de potencial de cosecha"""
+    if 'gdf_analisis' not in st.session_state or st.session_state.gdf_analisis is None:
+        st.warning("No hay datos de análisis disponibles")
+        return
+        
+    gdf = st.session_state.gdf_analisis
+    clima = st.session_state.get('datos_clima', {})
+    planetscope = st.session_state.get('datos_planetscope', {})
+    
+    st.markdown("## 🌴 POTENCIAL DE COSECHA - PALMA ACEITERA")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("☀️ Radiación Solar", f"{clima.get('radiacion_solar', 0):.1f} MJ/m²/día")
+    with col2:
+        st.metric("🌧️ Precipitación", f"{clima.get('precipitacion', 0)*30:.0f} mm/mes")
+    with col3:
+        st.metric("💨 Viento", f"{clima.get('velocidad_viento', 0):.1f} m/s")
+    with col4:
+        st.metric("🛰️ NDVI (PlanetScope)", f"{planetscope.get('ndvi_planetscope', 0):.2f}")
+    
+    potencial_prom = gdf['potencial_cosecha'].mean()
+    st.metric("📦 Potencial Cosecha Promedio", f"{potencial_prom:.1f} ton/ha/año")
+    
+    st.subheader("🗺️ Mapa de Potencial de Cosecha")
+    mapa_potencial = crear_mapa_interactivo(
+        gdf, 
+        "Potencial de Cosecha - Palma Aceitera", 
+        'potencial_cosecha', 
+        "POTENCIAL_COSECHA", 
+        "PALMA"
+    )
+    st_folium(mapa_potencial, width=800, height=500)
+    
+    st.subheader("📋 Datos por Zona")
+    columnas_cosecha = ['id_zona', 'potencial_cosecha', 'indice_fertilidad', 
+                       'radiacion_solar', 'precipitacion_mm_mes', 'velocidad_viento', 'ndvi_planetscope']
+    df_cosecha = gdf[columnas_cosecha].copy()
+    df_cosecha['precipitacion_mm_mes'] = df_cosecha['precipitacion'] * 30
+    st.dataframe(df_cosecha.round(2), use_container_width=True)
+    
+    st.markdown("### 📈 Recomendaciones para Maximizar Cosecha")
+    if potencial_prom < 15:
+        st.error("🚨 **BAJO POTENCIAL**: Considerar mejoras en riego, nutrición o manejo de sombra")
+    elif potencial_prom < 20:
+        st.warning("⚠️ **POTENCIAL MODERADO**: Optimizar fertilización y control de malezas")
+    else:
+        st.success("✅ **ALTO POTENCIAL**: Mantener prácticas actuales y monitorear continuamente")
+    
+    st.markdown("""
+    **Factores críticos para palma aceitera:**
+    - Radiación solar > 15 MJ/m²/día
+    - Precipitación mensual > 150 mm
+    - NDVI > 0.7 (buena cobertura vegetal)
+    - Fertilidad del suelo óptima (NPK balanceado)
+    """)
+
 def mostrar_modo_demo():
     st.markdown("### 🚀 Modo Demostración")
     st.info("""
@@ -1905,16 +1837,14 @@ def mostrar_configuracion_parcela():
             if analisis_tipo == "ANÁLISIS DE TEXTURA":
                 gdf_textura = analizar_textura_suelo(gdf_zonas, cultivo, mes_analisis)
                 st.session_state.analisis_textura = gdf_textura
-                st.session_state.gdf_analisis = gdf_zonas  # Para mantener consistencia
+                st.session_state.gdf_analisis = gdf_zonas
             else:
-                gdf_fert = calcular_indices_gee(gdf_zonas, cultivo, mes_analisis, analisis_tipo, nutriiente)
+                gdf_fert = calcular_indices_gee(gdf_zonas, cultivo, mes_analisis, analisis_tipo, nutriente)
                 st.session_state.gdf_analisis = gdf_fert
                 
-                # Análisis de textura siempre se hace
                 gdf_textura = analizar_textura_suelo(gdf_zonas, cultivo, mes_analisis)
                 st.session_state.analisis_textura = gdf_textura
                 
-                # Potencial de cosecha (solo para palma)
                 if cultivo == "PALMA_ACEITERA" and analisis_tipo in ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK"]:
                     centroid = gdf_original.geometry.centroid.iloc[0]
                     datos_clima = obtener_datos_nasa_power(centroid.y, centroid.x, mes_analisis)
@@ -1927,6 +1857,36 @@ def mostrar_configuracion_parcela():
             st.session_state.area_total = area_total
             st.session_state.analisis_completado = True
         st.rerun()
+
+# ============================================================================
+# INICIALIZACIÓN DE SESSION_STATE
+# ============================================================================
+if 'analisis_completado' not in st.session_state:
+    st.session_state.analisis_completado = False
+if 'gdf_original' not in st.session_state:
+    st.session_state.gdf_original = None
+if 'gdf_analisis' not in st.session_state:
+    st.session_state.gdf_analisis = None
+if 'analisis_textura' not in st.session_state:
+    st.session_state.analisis_textura = None
+if 'area_total' not in st.session_state:
+    st.session_state.area_total = 0.0
+if 'datos_demo' not in st.session_state:
+    st.session_state.datos_demo = False
+if 'cultivo' not in st.session_state:
+    st.session_state.cultivo = "PALMA_ACEITERA"
+if 'analisis_tipo' not in st.session_state:
+    st.session_state.analisis_tipo = "FERTILIDAD ACTUAL"
+if 'nutriente' not in st.session_state:
+    st.session_state.nutriente = "NITRÓGENO"
+if 'mes_analisis' not in st.session_state:
+    st.session_state.mes_analisis = "ENERO"
+if 'n_divisiones' not in st.session_state:
+    st.session_state.n_divisiones = 24
+if 'datos_clima' not in st.session_state:
+    st.session_state.datos_clima = None
+if 'datos_planetscope' not in st.session_state:
+    st.session_state.datos_planetscope = None
 
 # ============================================================================
 # SIDEBAR
@@ -1945,7 +1905,6 @@ with st.sidebar:
     st.subheader("📤 Subir Parcela")
     uploaded_file = st.file_uploader("Subir ZIP con shapefile o archivo KML de tu parcela", type=['zip', 'kml'])
     
-    # Opción para API de Planet (opcional)
     st.subheader("🛰️ PlanetScope (opcional)")
     planet_api_key = st.text_input("API Key de Planet (opcional)", type="password")
     st.info("Si no proporcionas una API key, se usarán datos simulados realistas.")
@@ -1992,7 +1951,6 @@ def main():
     if st.session_state.analisis_completado:
         cultivo = st.session_state.cultivo
         if cultivo == "PALMA_ACEITERA" and st.session_state.analisis_tipo in ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK"]:
-            # Mostrar las tres pestañas
             tab1, tab2, tab3 = st.tabs(["📊 Análisis Principal", "🏗️ Análisis de Textura", "📈 Potencial de Cosecha"])
             with tab1:
                 mostrar_resultados_principales()
@@ -2004,7 +1962,6 @@ def main():
             with tab3:
                 mostrar_potencial_cosecha()
         else:
-            # Solo dos pestañas
             if st.session_state.analisis_tipo == "ANÁLISIS DE TEXTURA":
                 mostrar_resultados_textura()
             else:
