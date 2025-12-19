@@ -1755,7 +1755,7 @@ def main():
         )
         st.session_state.gdf_original = gdf_demo
     if st.session_state.analisis_completado:
-        if analisis_tipo == "ANÁLISIS DE TEXTURA":
+        if st.session_state.analisis_tipo == "ANÁLISIS DE TEXTURA":
             mostrar_resultados_textura()
         else:
             tab1, tab2 = st.tabs(["📊 Análisis Principal", "🏗️ Análisis de Textura"])
