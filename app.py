@@ -9,7 +9,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import io
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 import math
 import folium
 from folium import plugins
@@ -104,7 +104,7 @@ FACTORES_N_MES = {
 }
 FACTORES_P_MES = {
     "ENERO": 1.0, "FEBRERO": 1.0, "MARZO": 1.05, "ABRIL": 1.1,
-    "MAYO": 1.15, "JUNIO": 1.1, "JULIO": 1.05, "AGOSTO": 1.0,
+    "MAYO": 1.15, "JUNIO": 1.1, "JULio": 1.05, "AGOSTO": 1.0,
     "SEPTIEMBRE": 1.0, "OCTUBRE": 1.05, "NOVIEMBRE": 1.1, "DICIEMBRE": 1.05
 }
 FACTORES_K_MES = {
@@ -120,7 +120,8 @@ PALETAS_GEE = {
     'FOSFORO': ['#67001f', '#b2182b', '#d6604d', '#f4a582', '#fddbc7', '#d1e5f0', '#92c5de', '#4393c3', '#2166ac', '#053061'],
     'POTASIO': ['#4d004b', '#810f7c', '#8c6bb1', '#8c96c6', '#9ebcda', '#bfd3e6', '#e0ecf4', '#edf8fb'],
     'TEXTURA': ['#8c510a', '#d8b365', '#f6e8c3', '#c7eae5', '#5ab4ac', '#01665e'],
-    'POTENCIAL': ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b']
+    'POTENCIAL': ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'],
+    'HEATMAP': ['blue', 'cyan', 'lime', 'yellow', 'orange', 'red']
 }
 
 # RECOMENDACIONES
@@ -223,7 +224,7 @@ RECOMENDACIONES_AGROECOLOGICAS = {
             "Canavalia ensiformis: Fijación de N",
             "Crotalaria spectabilis: Control nematodos"
         ],
-        'BIOFERTILIZANTes': [
+        'BIOFERTILIZANTES': [
             "Compost de pseudotallo: 4-5 ton/ha",
             "Bocashi bananero: 3 ton/ha",
             "Biofertilizante a base de micorrizas"
@@ -1006,6 +1007,233 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
     m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
     return m
 
+def crear_mapa_heatmap_potencial_cosecha(gdf):
+    """Crea un mapa de calor (heatmap) para el potencial de cosecha"""
+    if gdf.empty or 'potencial_cosecha' not in gdf.columns:
+        return None
+    
+    # Obtener el centroide para centrar el mapa
+    centroid = gdf.geometry.centroid.iloc[0]
+    
+    # Crear mapa base
+    m = folium.Map(
+        location=[centroid.y, centroid.x],
+        zoom_start=15,
+        tiles='OpenStreetMap',
+        attr='© OpenStreetMap contributors'
+    )
+    
+    # Agregar capa de satélite
+    folium.TileLayer(
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr='Esri',
+        name='Esri Satélite',
+        overlay=False
+    ).add_to(m)
+    
+    # Preparar datos para el heatmap
+    heat_data = []
+    
+    # Para cada zona, generar múltiples puntos ponderados por el potencial de cosecha
+    for idx, row in gdf.iterrows():
+        if row.geometry is None:
+            continue
+            
+        # Obtener el potencial de cosecha
+        potencial = row.get('potencial_cosecha', 0)
+        
+        # Si no hay potencial, saltar
+        if potencial <= 0:
+            continue
+        
+        # Generar puntos dentro del polígono basado en el potencial
+        # Más puntos para mayor potencial
+        num_puntos = max(5, min(20, int(potencial * 2)))
+        
+        # Obtener los límites del polígono
+        bounds = row.geometry.bounds
+        minx, miny, maxx, maxy = bounds
+        
+        # Generar puntos aleatorios dentro del polígono
+        puntos_generados = 0
+        intentos = 0
+        max_intentos = num_puntos * 10
+        
+        while puntos_generados < num_puntos and intentos < max_intentos:
+            intentos += 1
+            
+            # Generar un punto aleatorio dentro del bounding box
+            random_x = np.random.uniform(minx, maxx)
+            random_y = np.random.uniform(miny, maxy)
+            random_point = Point(random_x, random_y)
+            
+            # Verificar si el punto está dentro del polígono
+            if row.geometry.contains(random_point):
+                # El peso se normaliza entre 0 y 1 basado en el potencial
+                # Suponiendo que el potencial máximo es 30 ton/ha/año
+                peso_normalizado = min(1.0, potencial / 30.0)
+                
+                # Añadir el punto al heatmap
+                heat_data.append([random_y, random_x, peso_normalizado])
+                puntos_generados += 1
+    
+    # Si hay datos para el heatmap, agregarlo
+    if heat_data:
+        # Crear el heatmap
+        plugins.HeatMap(
+            heat_data,
+            name='Potencial de Cosecha',
+            min_opacity=0.2,
+            max_zoom=18,
+            radius=25,
+            blur=15,
+            gradient={0.2: 'blue', 0.4: 'cyan', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red'}
+        ).add_to(m)
+    
+    # Agregar también los polígonos originales con transparencia
+    for idx, row in gdf.iterrows():
+        if row.geometry is None:
+            continue
+            
+        potencial = row.get('potencial_cosecha', 0)
+        
+        # Calcular color basado en el potencial
+        if potencial < 10:
+            color = 'gray'
+        elif potencial < 15:
+            color = 'yellow'
+        elif potencial < 20:
+            color = 'orange'
+        else:
+            color = 'red'
+        
+        # Crear popup con información
+        popup_text = f"""
+        <div style="font-family: Arial; font-size: 12px;">
+            <h4>Zona {row.get('id_zona', idx)}</h4>
+            <b>Potencial Cosecha:</b> {potencial:.1f} ton/ha/año<br>
+            <b>Área:</b> {row.get('area_ha', 0):.2f} ha<br>
+            <b>Índice Fertilidad:</b> {row.get('indice_fertilidad', 0):.3f}
+        </div>
+        """
+        
+        folium.GeoJson(
+            row.geometry.__geo_interface__,
+            style_function=lambda x, color=color: {
+                'fillColor': color,
+                'color': 'black',
+                'weight': 1,
+                'fillOpacity': 0.2,  # Muy transparente para no tapar el heatmap
+                'opacity': 0.5
+            },
+            popup=folium.Popup(popup_text, max_width=300)
+        ).add_to(m)
+    
+    # Agregar control de capas
+    folium.LayerControl().add_to(m)
+    
+    # Ajustar límites del mapa
+    bounds = gdf.total_bounds
+    m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+    
+    return m
+
+def crear_mapa_densidad_puntos(gdf):
+    """Crea un mapa de densidad de puntos para visualizar distribución espacial"""
+    if gdf.empty or 'potencial_cosecha' not in gdf.columns:
+        return None
+    
+    centroid = gdf.geometry.centroid.iloc[0]
+    
+    m = folium.Map(
+        location=[centroid.y, centroid.x],
+        zoom_start=15,
+        tiles='OpenStreetMap'
+    )
+    
+    # Agregar capa de satélite
+    folium.TileLayer(
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr='Esri',
+        name='Esri Satélite',
+        overlay=False
+    ).add_to(m)
+    
+    # Preparar datos para densidad
+    density_data = []
+    
+    for idx, row in gdf.iterrows():
+        if row.geometry is None:
+            continue
+            
+        potencial = row.get('potencial_cosecha', 0)
+        
+        # Generar puntos proporcionales al potencial
+        num_puntos = max(3, min(15, int(potencial)))
+        
+        bounds = row.geometry.bounds
+        minx, miny, maxx, maxy = bounds
+        
+        puntos_generados = 0
+        intentos = 0
+        max_intentos = num_puntos * 10
+        
+        while puntos_generados < num_puntos and intentos < max_intentos:
+            intentos += 1
+            
+            random_x = np.random.uniform(minx, maxx)
+            random_y = np.random.uniform(miny, maxy)
+            random_point = Point(random_x, random_y)
+            
+            if row.geometry.contains(random_point):
+                # Color basado en el potencial
+                if potencial < 10:
+                    color = 'gray'
+                elif potencial < 15:
+                    color = 'yellow'
+                elif potencial < 20:
+                    color = 'orange'
+                else:
+                    color = 'red'
+                
+                # Tamaño del marcador basado en el potencial
+                size = max(3, min(10, int(potencial / 3)))
+                
+                folium.CircleMarker(
+                    location=[random_y, random_x],
+                    radius=size,
+                    color=color,
+                    fill=True,
+                    fillColor=color,
+                    fillOpacity=0.7,
+                    popup=f"Potencial: {potencial:.1f} ton/ha/año"
+                ).add_to(m)
+                
+                puntos_generados += 1
+    
+    # Agregar los polígonos originales (transparentes)
+    for idx, row in gdf.iterrows():
+        if row.geometry is None:
+            continue
+            
+        folium.GeoJson(
+            row.geometry.__geo_interface__,
+            style_function=lambda x: {
+                'fillColor': 'transparent',
+                'color': 'black',
+                'weight': 2,
+                'fillOpacity': 0,
+                'opacity': 0.5
+            }
+        ).add_to(m)
+    
+    folium.LayerControl().add_to(m)
+    
+    bounds = gdf.total_bounds
+    m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+    
+    return m
+
 def crear_mapa_visualizador_parcela(gdf):
     centroid = gdf.geometry.centroid.iloc[0]
     bounds = gdf.total_bounds
@@ -1785,59 +2013,163 @@ def mostrar_potencial_cosecha():
     potencial_prom = gdf['potencial_cosecha'].mean()
     st.metric("📦 Potencial Cosecha Promedio", f"{potencial_prom:.1f} ton/ha/año")
     
-    st.subheader("🗺️ Mapa de Potencial de Cosecha")
-    mapa_potencial = crear_mapa_interactivo(
-        gdf, 
-        "Potencial de Cosecha - Palma Aceitera", 
-        'potencial_cosecha', 
-        "POTENCIAL_COSECHA", 
-        "PALMA"
-    )
-    st_folium(mapa_potencial, width=800, height=500)
+    # Mostrar pestañas para diferentes visualizaciones
+    tab1, tab2, tab3 = st.tabs(["🗺️ Mapa por Zonas", "🔥 Mapa de Calor", "📊 Análisis Detallado"])
     
-    st.subheader("📋 Datos por Zona")
-    
-    # Crear lista de columnas a mostrar, verificando existencia
-    columnas_cosecha = ['id_zona', 'potencial_cosecha', 'indice_fertilidad']
-    
-    # Agregar columnas climáticas si existen
-    columnas_clima = ['radiacion_solar', 'precipitacion', 'velocidad_viento']
-    for col in columnas_clima:
-        if col in gdf.columns:
-            columnas_cosecha.append(col)
-    
-    # Agregar columnas PlanetScope si existen
-    columnas_ps = ['ndvi_planetscope', 'evi_planetscope', 'lai_planetscope']
-    for col in columnas_ps:
-        if col in gdf.columns:
-            columnas_cosecha.append(col)
-    
-    # Filtrar solo columnas que existen
-    columnas_cosecha = [col for col in columnas_cosecha if col in gdf.columns]
-    
-    if columnas_cosecha:
-        df_cosecha = gdf[columnas_cosecha].copy()
+    with tab1:
+        st.subheader("🗺️ Mapa de Potencial de Cosecha por Zonas")
+        mapa_potencial = crear_mapa_interactivo(
+            gdf, 
+            "Potencial de Cosecha - Palma Aceitera", 
+            'potencial_cosecha', 
+            "POTENCIAL_COSECHA", 
+            "PALMA"
+        )
+        st_folium(mapa_potencial, width=800, height=500)
         
-        # Convertir precipitación de mm/día a mm/mes para visualización
-        if 'precipitacion' in df_cosecha.columns:
-            df_cosecha['precipitacion_mm_mes'] = df_cosecha['precipitacion'] * 30
+        st.markdown("### 📄 Mapa para Reporte")
+        mapa_estatico = crear_mapa_estatico(
+            gdf, 
+            "Potencial de Cosecha - Palma Aceitera", 
+            'potencial_cosecha', 
+            "POTENCIAL_COSECHA", 
+            "PALMA"
+        )
+        if mapa_estatico:
+            st.image(mapa_estatico, caption="Potencial de Cosecha", use_column_width=True)
+    
+    with tab2:
+        st.subheader("🔥 Mapa de Calor - Distribución Espacial del Potencial")
+        st.info("""
+        **Interpretación del mapa de calor:**
+        - 🔴 **Rojo:** Áreas de alto potencial (> 20 ton/ha/año)
+        - 🟡 **Amarillo:** Áreas de potencial medio (15-20 ton/ha/año)
+        - 🔵 **Azul:** Áreas de potencial bajo (< 15 ton/ha/año)
         
-        # Redondear valores
-        for col in df_cosecha.columns:
-            if df_cosecha[col].dtype in [np.float64, np.float32]:
-                df_cosecha[col] = df_cosecha[col].round(2)
+        El mapa muestra la densidad del potencial de cosecha, permitiendo identificar zonas críticas y áreas de oportunidad.
+        """)
         
-        st.dataframe(df_cosecha, use_container_width=True)
-    else:
-        st.warning("No hay datos disponibles para mostrar en la tabla.")
+        # Crear y mostrar mapa de calor
+        heatmap = crear_mapa_heatmap_potencial_cosecha(gdf)
+        if heatmap:
+            st_folium(heatmap, width=800, height=500)
+        else:
+            st.warning("No se pudo generar el mapa de calor. Verifique los datos de potencial de cosecha.")
+        
+        # Opción de mapa de densidad de puntos
+        st.subheader("📊 Mapa de Densidad de Puntos")
+        st.info("Visualización alternativa que muestra puntos distribuidos proporcionalmente al potencial de cosecha.")
+        
+        if st.button("🔄 Generar Mapa de Densidad", key="densidad_potencial"):
+            with st.spinner("Generando mapa de densidad..."):
+                densidad_map = crear_mapa_densidad_puntos(gdf)
+                if densidad_map:
+                    st_folium(densidad_map, width=800, height=500)
+                else:
+                    st.error("No se pudo generar el mapa de densidad")
+    
+    with tab3:
+        st.subheader("📋 Datos por Zona")
+        
+        # Crear lista de columnas a mostrar, verificando existencia
+        columnas_cosecha = ['id_zona', 'potencial_cosecha', 'indice_fertilidad', 'area_ha']
+        
+        # Agregar columnas climáticas si existen
+        columnas_clima = ['radiacion_solar', 'precipitacion', 'velocidad_viento']
+        for col in columnas_clima:
+            if col in gdf.columns:
+                columnas_cosecha.append(col)
+        
+        # Agregar columnas PlanetScope si existen
+        columnas_ps = ['ndvi_planetscope', 'evi_planetscope', 'lai_planetscope']
+        for col in columnas_ps:
+            if col in gdf.columns:
+                columnas_cosecha.append(col)
+        
+        # Filtrar solo columnas que existen
+        columnas_cosecha = [col for col in columnas_cosecha if col in gdf.columns]
+        
+        if columnas_cosecha:
+            df_cosecha = gdf[columnas_cosecha].copy()
+            
+            # Convertir precipitación de mm/día a mm/mes para visualización
+            if 'precipitacion' in df_cosecha.columns:
+                df_cosecha['precipitacion_mm_mes'] = df_cosecha['precipitacion'] * 30
+            
+            # Redondear valores
+            for col in df_cosecha.columns:
+                if df_cosecha[col].dtype in [np.float64, np.float32]:
+                    df_cosecha[col] = df_cosecha[col].round(2)
+            
+            st.dataframe(df_cosecha, use_container_width=True)
+            
+            # Mostrar estadísticas descriptivas
+            st.subheader("📈 Estadísticas Descriptivas")
+            stats_df = df_cosecha[['potencial_cosecha', 'indice_fertilidad']].describe()
+            st.dataframe(stats_df)
+            
+            # Gráfico de distribución del potencial
+            st.subheader("📊 Distribución del Potencial de Cosecha")
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.hist(df_cosecha['potencial_cosecha'], bins=15, color='#2ca02c', alpha=0.7, edgecolor='black')
+            ax.axvline(potencial_prom, color='red', linestyle='--', linewidth=2, label=f'Promedio: {potencial_prom:.1f} ton/ha/año')
+            ax.set_xlabel('Potencial de Cosecha (ton/ha/año)')
+            ax.set_ylabel('Frecuencia')
+            ax.set_title('Distribución del Potencial de Cosecha')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+        else:
+            st.warning("No hay datos disponibles para mostrar en la tabla.")
     
     st.markdown("### 📈 Recomendaciones para Maximizar Cosecha")
     if potencial_prom < 15:
         st.error("🚨 **BAJO POTENCIAL**: Considerar mejoras en riego, nutrición o manejo de sombra")
+        st.markdown("""
+        **Acciones recomendadas:**
+        1. **Riego suplementario:** Implementar sistema de riego por goteo
+        2. **Fertilización intensiva:** Aplicar NPK según análisis de suelo
+        3. **Manejo de sombra:** Regular sombra al 30-40% para palma adulta
+        4. **Control de malezas:** Eliminar competencia por nutrientes y agua
+        """)
     elif potencial_prom < 20:
         st.warning("⚠️ **POTENCIAL MODERADO**: Optimizar fertilización y control de malezas")
+        st.markdown("""
+        **Acciones recomendadas:**
+        1. **Fertilización balanceada:** Mantener niveles óptimos de NPK
+        2. **Manejo integrado:** Control biológico de plagas y enfermedades
+        3. **Monitoreo continuo:** Seguimiento con datos satelitales
+        4. **Mejora de suelo:** Aplicación de materia orgánica
+        """)
     else:
         st.success("✅ **ALTO POTENCIAL**: Mantener prácticas actuales y monitorear continuamente")
+        st.markdown("""
+        **Acciones recomendadas:**
+        1. **Mantenimiento preventivo:** Continuar con buenas prácticas agrícolas
+        2. **Monitoreo satelital:** Seguimiento continuo con PlanetScope
+        3. **Fertilización de mantenimiento:** Aplicar dosis moderadas de NPK
+        4. **Documentación:** Registrar prácticas exitosas para replicación
+        """)
+    
+    st.markdown("### 💾 Descargar Resultados")
+    col1, col2 = st.columns(2)
+    with col1:
+        if 'df_cosecha' in locals():
+            csv = df_cosecha.to_csv(index=False)
+            st.download_button(
+                label="📥 Descargar Datos CSV",
+                data=csv,
+                file_name=f"potencial_cosecha_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
+    with col2:
+        geojson = gdf.to_json()
+        st.download_button(
+            label="🗺️ Descargar GeoJSON",
+            data=geojson,
+            file_name=f"potencial_cosecha_{datetime.now().strftime('%Y%m%d_%H%M')}.geojson",
+            mime="application/json"
+        )
     
     st.markdown("""
     **Factores críticos para palma aceitera:**
@@ -1845,6 +2177,8 @@ def mostrar_potencial_cosecha():
     - Precipitación mensual > 150 mm
     - NDVI > 0.7 (buena cobertura vegetal)
     - Fertilidad del suelo óptima (NPK balanceado)
+    - Temperatura promedio 24-28°C
+    - Humedad relativa 75-85%
     """)
 
 def mostrar_modo_demo():
@@ -1861,6 +2195,7 @@ def mostrar_modo_demo():
     - 🛰️ Datos simulados de PlanetScope (NDVI, EVI, LAI)
     - 🌴 Potencial de cosecha de palma aceitera
     - 📊 Fertilidad, textura y agroecología
+    - 🔥 Mapas de calor para visualización avanzada
 
     **📁 El shapefile debe incluir:**
     - .shp (geometrías)
@@ -2011,6 +2346,11 @@ def main():
     - 🌧️ Precipitación (mm/día)
     - 💨 Velocidad del viento (m/s)
     - 🛰️ NDVI, EVI, LAI (PlanetScope)
+    
+    **NUEVO: Mapas de Calor**
+    - 🔥 Visualización de densidad de potencial
+    - 📊 Análisis espacial avanzado
+    - 🎯 Identificación de zonas críticas
     
     **Solo para PALMA ACEITERA:**
     - 📈 Potencial de cosecha (ton/ha/año)
