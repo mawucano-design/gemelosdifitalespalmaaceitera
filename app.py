@@ -223,7 +223,7 @@ RECOMENDACIONES_AGROECOLOGICAS = {
             "Canavalia ensiformis: Fijación de N",
             "Crotalaria spectabilis: Control nematodos"
         ],
-        'BIOFERTILIZANTES': [
+        'BIOFERTILIZANTes': [
             "Compost de pseudotallo: 4-5 ton/ha",
             "Bocashi bananero: 3 ton/ha",
             "Biofertilizante a base de micorrizas"
@@ -316,6 +316,11 @@ def calcular_potencial_cosecha(gdf_analisis, datos_clima, datos_planetscope, cul
     factor_agua = min(1.0, precip_mensual / 200.0)
     factor_viento = max(0.7, 1.0 - (viento - 2.0) / 10.0)
     factor_ndvi = min(1.0, ndvi / 0.8)
+    
+    # Asegurarse de que 'indice_fertilidad' existe
+    if 'indice_fertilidad' not in gdf_analisis.columns:
+        gdf_analisis['indice_fertilidad'] = 0.6
+    
     factor_suelo = gdf_analisis['indice_fertilidad']
     
     potencial_base = 25.0
@@ -328,10 +333,20 @@ def calcular_potencial_cosecha(gdf_analisis, datos_clima, datos_planetscope, cul
         factor_ndvi
     )
     
+    # Agregar columnas de clima
     for key, value in datos_clima.items():
         gdf_analisis[key] = value
+    
+    # Agregar columnas de PlanetScope
     for key, value in datos_planetscope.items():
         gdf_analisis[key] = value
+    
+    # Asegurar que id_zona existe
+    if 'id_zona' not in gdf_analisis.columns:
+        if 'id' in gdf_analisis.columns:
+            gdf_analisis['id_zona'] = gdf_analisis['id']
+        else:
+            gdf_analisis['id_zona'] = range(1, len(gdf_analisis) + 1)
         
     return gdf_analisis
 
@@ -343,21 +358,41 @@ def calcular_superficie(gdf):
     try:
         if gdf is None or gdf.empty or gdf.geometry.isnull().all():
             return 0.0
+        
+        # Si el CRS es geográfico (grados), convertir a un CRS proyectado
         if gdf.crs and gdf.crs.is_geographic:
-            try:
-                gdf_proj = gdf.to_crs('EPSG:3116')
-                area_m2 = gdf_proj.geometry.area
-            except:
+            # Intentar diferentes CRS proyectados comunes para América Latina
+            crs_options = ['EPSG:3116', 'EPSG:3857', 'EPSG:32719', 'EPSG:32718', 'EPSG:5367']
+            
+            for crs_code in crs_options:
                 try:
-                    gdf_proj = gdf.to_crs('EPSG:3857')
-                    area_m2 = gdf_proj.geometry.area
+                    gdf_proj = gdf.to_crs(crs_code)
+                    area_m2 = gdf_proj.geometry.area.sum()
+                    break
                 except:
-                    area_m2 = gdf.geometry.area.mean() * 111000 * 111000
+                    continue
+            else:
+                # Si todos los CRS fallan, usar aproximación simple
+                # Calcular área aproximada usando fórmula de esfera
+                centro = gdf.geometry.centroid.iloc[0]
+                lat_rad = math.radians(centro.y)
+                # Factor de corrección para convertir grados cuadrados a m2
+                m_per_degree_lat = 111319.9
+                m_per_degree_lon = 111319.9 * math.cos(lat_rad)
+                
+                # Calcular bounds
+                bounds = gdf.total_bounds
+                width_deg = bounds[2] - bounds[0]
+                height_deg = bounds[3] - bounds[1]
+                
+                area_m2 = abs(width_deg * m_per_degree_lon * height_deg * m_per_degree_lat)
         else:
-            area_m2 = gdf.geometry.area
+            area_m2 = gdf.geometry.area.sum()
+        
         area_ha = area_m2 / 10000
         return float(area_ha) if not np.isnan(area_ha) else 0.0
-    except:
+    except Exception as e:
+        st.warning(f"Advertencia en cálculo de área: {str(e)}")
         return 0.0
 
 def procesar_archivo(uploaded_file):
@@ -384,7 +419,8 @@ def procesar_archivo(uploaded_file):
             if not gdf.is_valid.all():
                 gdf = gdf.make_valid()
             return gdf
-    except:
+    except Exception as e:
+        st.error(f"Error procesando archivo: {str(e)}")
         return None
 
 def clasificar_textura_suelo(arena, limo, arcilla):
@@ -526,7 +562,7 @@ def analizar_textura_suelo(gdf, cultivo, mes_analisis):
             zonas_gdf.loc[idx, 'densidad_aparente'] = propiedades_fisicas['densidad_aparente']
             zonas_gdf.loc[idx, 'porosidad'] = propiedades_fisicas['porosidad']
             zonas_gdf.loc[idx, 'conductividad_hidraulica'] = propiedades_fisicas['conductividad_hidraulica']
-        except:
+        except Exception as e:
             area_ha = calcular_superficie(zonas_gdf.iloc[[idx]])
             zonas_gdf.loc[idx, 'area_ha'] = area_ha
             zonas_gdf.loc[idx, 'arena'] = params_textura['arena_optima']
@@ -758,7 +794,7 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente):
             zonas_gdf.loc[idx, 'recomendacion_npk'] = recomendacion
             zonas_gdf.loc[idx, 'deficit_npk'] = deficit
             zonas_gdf.loc[idx, 'prioridad'] = prioridad
-        except:
+        except Exception as e:
             area_ha = calcular_superficie(zonas_gdf.iloc[[idx]])
             zonas_gdf.loc[idx, 'area_ha'] = area_ha
             zonas_gdf.loc[idx, 'nitrogeno'] = params['NITROGENO']['optimo'] * 0.8
@@ -857,7 +893,7 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
             if analisis_tipo == "POTENCIAL_COSECHA":
                 popup_text = f"""
                 <div style="font-family: Arial; font-size: 12px;">
-                    <h4>Zona {row['id_zona']}</h4>
+                    <h4>Zona {row.get('id_zona', idx)}</h4>
                     <b>Potencial Cosecha:</b> {valor_display} {unidad}<br>
                     <b>Área:</b> {row.get('area_ha', 0):.2f} ha<br>
                     <hr>
@@ -870,7 +906,7 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
             elif analisis_tipo == "FERTILIDAD ACTUAL":
                 popup_text = f"""
                 <div style="font-family: Arial; font-size: 12px;">
-                    <h4>Zona {row['id_zona']}</h4>
+                    <h4>Zona {row.get('id_zona', idx)}</h4>
                     <b>Índice Fertilidad:</b> {valor_display}<br>
                     <b>Área:</b> {row.get('area_ha', 0):.2f} ha<br>
                     <b>Categoría:</b> {row.get('categoria', 'N/A')}<br>
@@ -886,7 +922,7 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
             elif analisis_tipo == "ANÁLISIS DE TEXTURA":
                 popup_text = f"""
                 <div style="font-family: Arial; font-size: 12px;">
-                    <h4>Zona {row['id_zona']}</h4>
+                    <h4>Zona {row.get('id_zona', idx)}</h4>
                     <b>Textura:</b> {valor_display}<br>
                     <b>Adecuación:</b> {row.get('adecuacion_textura', 0):.1%}<br>
                     <b>Área:</b> {row.get('area_ha', 0):.2f} ha<br>
@@ -901,7 +937,7 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
             else:
                 popup_text = f"""
                 <div style="font-family: Arial; font-size: 12px;">
-                    <h4>Zona {row['id_zona']}</h4>
+                    <h4>Zona {row.get('id_zona', idx)}</h4>
                     <b>Recomendación {nutriente}:</b> {valor_display} {unidad}<br>
                     <b>Área:</b> {row.get('area_ha', 0):.2f} ha<br>
                     <b>Categoría Fertilidad:</b> {row.get('categoria', 'N/A')}<br>
@@ -924,7 +960,7 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
                     'opacity': 0.9
                 },
                 popup=folium.Popup(popup_text, max_width=300),
-                tooltip=f"Zona {row['id_zona']}: {valor_display}"
+                tooltip=f"Zona {row.get('id_zona', idx)}: {valor_display}"
             ).add_to(m)
             
             centroid = row.geometry.centroid
@@ -944,10 +980,10 @@ def crear_mapa_interactivo(gdf, titulo, columna_valor=None, analisis_tipo=None, 
                         font-weight: bold; 
                         font-size: 11px;
                         color: black;
-                    ">{row["id_zona"]}</div>
+                    ">{row.get("id_zona", idx)}</div>
                     '''
                 ),
-                tooltip=f"Zona {row['id_zona']} - Click para detalles"
+                tooltip=f"Zona {row.get('id_zona', idx)} - Click para detalles"
             ).add_to(m)
     else:
         for idx, row in gdf.iterrows():
@@ -1050,7 +1086,7 @@ def crear_mapa_estatico(gdf, titulo, columna_valor=None, analisis_tipo=None, nut
                     texto_valor = f"{row[columna_valor]:.1f}"
                 else:
                     texto_valor = f"{row[columna_valor]:.0f} kg"
-                ax.annotate(f"Z{row['id_zona']}\n{texto_valor}", 
+                ax.annotate(f"Z{row.get('id_zona', idx)}\n{texto_valor}", 
                            (centroid.x, centroid.y), 
                            xytext=(3, 3), textcoords="offset points", 
                            fontsize=6, color='black', weight='bold',
@@ -1719,11 +1755,23 @@ def mostrar_potencial_cosecha():
         return
         
     gdf = st.session_state.gdf_analisis
+    
+    # Verificar si las columnas necesarias existen
+    columnas_necesarias = ['potencial_cosecha', 'indice_fertilidad']
+    columnas_faltantes = [col for col in columnas_necesarias if col not in gdf.columns]
+    
+    if columnas_faltantes:
+        st.error(f"Faltan columnas necesarias: {', '.join(columnas_faltantes)}")
+        st.info("El análisis de potencial de cosecha solo está disponible para PALMA ACEITERA en análisis de FERTILIDAD ACTUAL o RECOMENDACIONES NPK")
+        return
+    
+    # Obtener datos climáticos si existen
     clima = st.session_state.get('datos_clima', {})
     planetscope = st.session_state.get('datos_planetscope', {})
     
     st.markdown("## 🌴 POTENCIAL DE COSECHA - PALMA ACEITERA")
     
+    # Mostrar métricas con verificación
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("☀️ Radiación Solar", f"{clima.get('radiacion_solar', 0):.1f} MJ/m²/día")
@@ -1748,11 +1796,40 @@ def mostrar_potencial_cosecha():
     st_folium(mapa_potencial, width=800, height=500)
     
     st.subheader("📋 Datos por Zona")
-    columnas_cosecha = ['id_zona', 'potencial_cosecha', 'indice_fertilidad', 
-                       'radiacion_solar', 'precipitacion_mm_mes', 'velocidad_viento', 'ndvi_planetscope']
-    df_cosecha = gdf[columnas_cosecha].copy()
-    df_cosecha['precipitacion_mm_mes'] = df_cosecha['precipitacion'] * 30
-    st.dataframe(df_cosecha.round(2), use_container_width=True)
+    
+    # Crear lista de columnas a mostrar, verificando existencia
+    columnas_cosecha = ['id_zona', 'potencial_cosecha', 'indice_fertilidad']
+    
+    # Agregar columnas climáticas si existen
+    columnas_clima = ['radiacion_solar', 'precipitacion', 'velocidad_viento']
+    for col in columnas_clima:
+        if col in gdf.columns:
+            columnas_cosecha.append(col)
+    
+    # Agregar columnas PlanetScope si existen
+    columnas_ps = ['ndvi_planetscope', 'evi_planetscope', 'lai_planetscope']
+    for col in columnas_ps:
+        if col in gdf.columns:
+            columnas_cosecha.append(col)
+    
+    # Filtrar solo columnas que existen
+    columnas_cosecha = [col for col in columnas_cosecha if col in gdf.columns]
+    
+    if columnas_cosecha:
+        df_cosecha = gdf[columnas_cosecha].copy()
+        
+        # Convertir precipitación de mm/día a mm/mes para visualización
+        if 'precipitacion' in df_cosecha.columns:
+            df_cosecha['precipitacion_mm_mes'] = df_cosecha['precipitacion'] * 30
+        
+        # Redondear valores
+        for col in df_cosecha.columns:
+            if df_cosecha[col].dtype in [np.float64, np.float32]:
+                df_cosecha[col] = df_cosecha[col].round(2)
+        
+        st.dataframe(df_cosecha, use_container_width=True)
+    else:
+        st.warning("No hay datos disponibles para mostrar en la tabla.")
     
     st.markdown("### 📈 Recomendaciones para Maximizar Cosecha")
     if potencial_prom < 15:
@@ -1887,6 +1964,8 @@ if 'datos_clima' not in st.session_state:
     st.session_state.datos_clima = None
 if 'datos_planetscope' not in st.session_state:
     st.session_state.datos_planetscope = None
+if 'gdf_zonas' not in st.session_state:
+    st.session_state.gdf_zonas = None
 
 # ============================================================================
 # SIDEBAR
@@ -1897,7 +1976,13 @@ with st.sidebar:
                           ["PALMA_ACEITERA", "CACAO", "BANANO"])
     st.session_state.analisis_tipo = st.selectbox("Tipo de Análisis:", 
                                ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK", "ANÁLISIS DE TEXTURA"])
-    st.session_state.nutriente = st.selectbox("Nutriente:", ["NITRÓGENO", "FÓSFORO", "POTASIO"])
+    
+    # Solo mostrar selector de nutriente si el tipo de análisis es RECOMENDACIONES NPK
+    if st.session_state.analisis_tipo == "RECOMENDACIONES NPK":
+        st.session_state.nutriente = st.selectbox("Nutriente:", ["NITRÓGENO", "FÓSFORO", "POTASIO"])
+    else:
+        st.session_state.nutriente = "NITRÓGENO"  # Valor por defecto
+    
     st.session_state.mes_analisis = st.selectbox("Mes de Análisis:", 
                                ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
                                 "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"])
