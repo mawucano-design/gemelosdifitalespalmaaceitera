@@ -1,11 +1,11 @@
-streamlit>=1.32.0
-geopandas>=0.14.0
-folium>=0.14.0
-streamlit-folium>=0.15.1
-shapely>=2.0.0
-fiona>=1.9.0
-pyproj>=3.6.0
-reportlab>=4.0.0
-matplotlib>=3.7.0
-numpy>=1.21.0
-requests>=2.31.0
+streamlit
+geopandas
+pandas
+numpy
+matplotlib
+folium
+streamlit-folium
+reportlab
+fiona
+requests
+plotly  # ✅ esta es la que falta
