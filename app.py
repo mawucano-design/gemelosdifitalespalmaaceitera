@@ -30,7 +30,54 @@ import warnings
 # Suprimir advertencias molestas
 warnings.filterwarnings("ignore", message=".*initial implementation of Parquet.*")
 
+# === PALETA DE COLORES MODERNA ===
+COLORS = {
+    'primary': '#2E7D32',        # Verde oscuro
+    'secondary': '#4CAF50',      # Verde medio
+    'accent': '#81C784',         # Verde claro
+    'warning': '#FF9800',        # Naranja
+    'danger': '#F44336',         # Rojo
+    'info': '#2196F3',           # Azul
+    'card_bg': '#FFFFFF',
+    'text': '#2C3E50',
+    'border': '#E0E0E0'
+}
+
+# === CSS PERSONALIZADO ===
+def inject_custom_css():
+    st.markdown(f"""
+    <style>
+    .stApp {{ background-color: {COLORS['background_light'] if 'background_light' in COLORS else '#F9F9F9'}; }}
+    .metric-card {{
+        background: {COLORS['card_bg']};
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        border-left: 4px solid {COLORS['primary']};
+        margin: 8px 0;
+        transition: transform 0.2s;
+    }}
+    .metric-card:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }}
+    .metric-title {{ color: {COLORS['text']}; font-size: 14px; font-weight: 500; margin-bottom: 8px; }}
+    .metric-value {{ color: {COLORS['primary']}; font-size: 28px; font-weight: 700; margin: 0; }}
+    .metric-delta {{ color: {COLORS['secondary']}; font-size: 14px; margin-top: 4px; }}
+    h1, h2, h3, h4 {{ color: {COLORS['text']}; font-weight: 600; }}
+    .stButton>button {{
+        background-color: {COLORS['primary']};
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 20px;
+    }}
+    .stButton>button:hover {{ background-color: #1B5E20; color: white; }}
+    </style>
+    """, unsafe_allow_html=True)
+
 st.set_page_config(page_title="🌴 Analizador Cultivos", layout="wide")
+inject_custom_css()
 st.title("🌱 ANALIZADOR CULTIVOS - METODOLOGÍA GEE COMPLETA CON AGROECOLOGÍA")
 st.markdown("---")
 
@@ -406,7 +453,7 @@ def calcular_superficie(gdf):
         except:
             return 1.0
 
-# ✅ FUNCIÓN MEJORADA CON LEYENDA MODERNA
+# ✅ FUNCIÓN MEJORADA CON LEYENDA MODERNA Y SOPORTE CLIMÁTICO
 def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=None, nutriente=None):
     centroid = gdf.geometry.centroid.iloc[0]
     bounds = gdf.total_bounds
@@ -446,6 +493,21 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
                 'NO_DETERMINADA': '#999999'
             }
             unidad = "Textura"
+        elif analisis_tipo == "CLIMÁTICO":  # ✅ NUEVO
+            if nutriente == "RAD":
+                vmin, vmax = 10, 25
+                unidad = "MJ/m²/día"
+            elif nutriente == "PRECIP":
+                vmin, vmax = 0, 15
+                unidad = "mm/día"
+            elif nutriente == "VIENTO":
+                vmin, vmax = 0, 5
+                unidad = "m/s"
+            else:  # HUMEDAD
+                vmin, vmax = 40, 100
+                unidad = "%"
+            # Paleta climática
+            colores = ['#253494', '#2c7fb8', '#41b6c4', '#a1dab4', '#ffffcc']
         else:
             if nutriente == "NITRÓGENO":
                 vmin, vmax = 0, 250
@@ -478,6 +540,8 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
                 color = obtener_color(valor, vmin, vmax, colores)
                 if analisis_tipo == "FERTILIDAD ACTUAL":
                     valor_display = f"{valor:.3f}"
+                elif analisis_tipo == "CLIMÁTICO":
+                    valor_display = f"{valor:.1f}"
                 else:
                     valor_display = f"{valor:.1f}"
 
@@ -510,6 +574,14 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
                     <b>Arcilla:</b> {row.get('arcilla', 0):.1f}%<br>
                     <b>Capacidad Campo:</b> {row.get('capacidad_campo', 0):.1f} mm/m<br>
                     <b>Agua Disponible:</b> {row.get('agua_disponible', 0):.1f} mm/m
+                </div>
+                """
+            elif analisis_tipo == "CLIMÁTICO":
+                popup_text = f"""
+                <div style="font-family: Arial; font-size: 12px;">
+                    <h4>Zona {row['id_zona']}</h4>
+                    <b>{titulo}:</b> {valor_display} {unidad}<br>
+                    <b>Área:</b> {row.get('area_ha', 0):.2f} ha
                 </div>
                 """
             else:
@@ -623,14 +695,27 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
                 'Arenoso': '#d8b365'
             }.items():
                 legend_html += f'<div style="margin:3px 0; display:flex; align-items:center;"><div style="background:{color}; width:16px; height:12px; margin-right:6px; border:1px solid #999;"></div><span style="font-size:11px; color:#333;">{textura}</span></div>'
-        else:
+        else:  # RECOMENDACIONES NPK o CLIMÁTICO
             steps = 6
             for i in range(steps):
                 value = vmin + (i / (steps - 1)) * (vmax - vmin)
                 color_idx = int((i / (steps - 1)) * (len(colores) - 1))
                 color = colores[color_idx]
-                intensidad = ["Muy Baja", "Baja", "Media", "Alta", "Muy Alta", "Máxima"][i]
-                legend_html += f'<div style="margin:3px 0; display:flex; align-items:center;"><div style="background:{color}; width:16px; height:12px; margin-right:6px; border:1px solid #999;"></div><span style="font-size:11px; color:#333;">{value:.0f} ({intensidad})</span></div>'
+                # Etiquetas descriptivas para clima
+                if analisis_tipo == "CLIMÁTICO":
+                    if nutriente == "RAD":
+                        intensidad = ["Muy Baja", "Baja", "Moderada", "Alta", "Muy Alta", "Extrema"][i]
+                    elif nutriente == "PRECIP":
+                        intensidad = ["Nula", "Muy Baja", "Baja", "Moderada", "Alta", "Muy Alta"][i]
+                    elif nutriente == "VIENTO":
+                        intensidad = ["Calma", "Suave", "Moderado", "Fuerte", "Muy Fuerte", "Extremo"][i]
+                    else:  # HUMEDAD
+                        intensidad = ["Muy Seca", "Seca", "Moderada", "Húmeda", "Muy Húmeda", "Saturada"][i]
+                else:  # NPK
+                    intensidad = ["Muy Baja", "Baja", "Media", "Alta", "Muy Alta", "Máxima"][i]
+                
+                label = f"{value:.1f}" if nutriente == "HUMEDAD" else f"{value:.0f}"
+                legend_html += f'<div style="margin:3px 0; display:flex; align-items:center;"><div style="background:{color}; width:16px; height:12px; margin-right:6px; border:1px solid #999;"></div><span style="font-size:11px; color:#333;">{label} ({intensidad})</span></div>'
         legend_html += '</div>'
         m.get_root().html.add_child(folium.Element(legend_html))
 
@@ -769,7 +854,7 @@ def crear_mapa_estatico(gdf, titulo, columna_valor=None, analisis_tipo=None, nut
 # FUNCIÓN PARA MOSTRAR RECOMENDACIONES AGROECOLÓGICAS
 def mostrar_recomendaciones_agroecologicas(cultivo, categoria, area_ha, analisis_tipo, nutriente=None, textura_data=None):
     st.markdown("### 🌿 RECOMENDACIONES AGROECOLÓGICAS")
-    if analisis_tipo == "ANÁLISIS DE TEXTURA" and textura_data:
+    if analisis_tipo == "ANÁLISIS DE TEXTURA" and textura_
         adecuacion_promedio = textura_data.get('adecuacion_promedio', 0.5)
         textura_predominante = textura_data.get('textura_predominante', 'Franco')
         if adecuacion_promedio >= 0.8:
@@ -1181,255 +1266,250 @@ def procesar_archivo(uploaded_file):
         st.error(f"❌ Error procesando archivo: {str(e)}")
         return None
 
-# FUNCIÓN PARA GENERAR PDF
-def generar_informe_pdf(gdf_analisis, cultivo, analisis_tipo, nutriente, mes_analisis, area_total, gdf_textura=None):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch)
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.darkgreen,
-        spaceAfter=30,
-        alignment=1
+# FUNCIÓN MODIFICADA PARA OBTENER DATOS DE NASA POWER (con humedad relativa)
+def obtener_datos_nasa_power(lat, lon, mes_analisis):
+    """Obtiene datos climáticos completos de NASA POWER"""
+    try:
+        mes_num = {
+            "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5, "JUNIO": 6,
+            "JULIO": 7, "AGOSTO": 8, "SEPTIEMBRE": 9, "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
+        }[mes_analisis]
+        año = datetime.now().year
+        start = f"{año}{mes_num:02d}01"
+        end = f"{año}{mes_num+1:02d}01" if mes_num < 12 else f"{año+1}0101"
+        url = "https://power.larc.nasa.gov/api/temporal/daily/point"
+        params = {
+            "parameters": "ALLSKY_SFC_SW_DWN,PRECTOTCORR,WS10M,RH2M",
+            "community": "ag",
+            "longitude": lon,
+            "latitude": lat,
+            "start": start,
+            "end": end,
+            "format": "json"
+        }
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            dias = data['properties']['parameter']
+            rad_solar = np.nanmean(list(dias['ALLSKY_SFC_SW_DWN'].values()))
+            precip = np.nanmean(list(dias['PRECTOTCORR'].values()))
+            viento = np.nanmean(list(dias['WS10M'].values()))
+            humedad = np.nanmean(list(dias['RH2M'].values()))  # ✅ HUMEDAD RELATIVA
+            return {
+                'radiacion_solar': float(rad_solar) if not np.isnan(rad_solar) else 16.0,
+                'precipitacion': float(precip) if not np.isnan(precip) else 6.0,
+                'velocidad_viento': float(viento) if not np.isnan(viento) else 2.5,
+                'humedad_relativa': float(humedad) if not np.isnan(humedad) else 70.0
+            }
+    except Exception as e:
+        st.warning(f"⚠️ Error obteniendo datos de NASA POWER: {str(e)}. Usando valores por defecto.")
+        return {
+            'radiacion_solar': 16.0,
+            'precipitacion': 6.0,
+            'velocidad_viento': 2.5,
+            'humedad_relativa': 70.0
+        }
+
+# FUNCIÓN PARA OBTENER DATOS DE PLANETSCOPE (simulado)
+def obtener_datos_planetscope(lat, lon, api_key=None):
+    np.random.seed(abs(hash(f"{lat:.4f}_{lon:.4f}")) % (2**32))
+    ndvi = np.clip(0.6 + np.random.normal(0, 0.1), 0.3, 0.9)
+    evi = np.clip(0.4 + np.random.normal(0, 0.08), 0.2, 0.7)
+    lai = np.clip(4.0 + np.random.normal(0, 0.8), 1.0, 8.0)
+    return {
+        'ndvi_planetscope': ndvi,
+        'evi_planetscope': evi,
+        'lai_planetscope': lai
+    }
+
+# FUNCIÓN PARA CALCULAR POTENCIAL DE COSECHA
+def calcular_potencial_cosecha(gdf_analisis, datos_clima, datos_planetscope, cultivo):
+    if cultivo != "PALMA_ACEITERA":
+        gdf_analisis['potencial_cosecha'] = 0.0
+        return gdf_analisis
+    rad_solar = datos_clima['radiacion_solar']
+    precip_mensual = datos_clima['precipitacion'] * 30
+    viento = datos_clima['velocidad_viento']
+    ndvi = datos_planetscope['ndvi_planetscope']
+    factor_rad = min(1.0, rad_solar / 20.0)
+    factor_agua = min(1.0, precip_mensual / 200.0)
+    factor_viento = max(0.7, 1.0 - (viento - 2.0) / 10.0)
+    factor_ndvi = min(1.0, ndvi / 0.8)
+    if 'indice_fertilidad' not in gdf_analisis.columns:
+        gdf_analisis['indice_fertilidad'] = 0.6
+    factor_suelo = gdf_analisis['indice_fertilidad']
+    potencial_base = 25.0
+    gdf_analisis['potencial_cosecha'] = (
+        potencial_base * 
+        factor_suelo * 
+        factor_rad * 
+        factor_agua * 
+        factor_viento * 
+        factor_ndvi
     )
-    heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=14,
-        textColor=colors.darkblue,
-        spaceAfter=12,
-        spaceBefore=12
-    )
-    normal_style = styles['Normal']
-    story = []
-    story.append(Paragraph("INFORME DE ANÁLISIS AGRÍCOLA", title_style))
-    story.append(Spacer(1, 20))
-    story.append(Paragraph("INFORMACIÓN GENERAL", heading_style))
-    info_data = [
-        ["Cultivo:", cultivo.replace('_', ' ').title()],
-        ["Tipo de Análisis:", analisis_tipo],
-        ["Mes de Análisis:", mes_analisis],
-        ["Área Total:", f"{area_total:.2f} ha"],
-        ["Fecha de Generación:", datetime.now().strftime("%d/%m/%Y %H:%M")]
-    ]
-    if analisis_tipo == "RECOMENDACIONES NPK":
-        info_data.insert(2, ["Nutriente Analizado:", nutriente])
-    info_table = Table(info_data, colWidths=[2*inch, 3*inch])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    story.append(info_table)
-    story.append(Spacer(1, 20))
-    story.append(Paragraph("ESTADÍSTICAS DEL ANÁLISIS", heading_style))
-    if analisis_tipo == "FERTILIDAD ACTUAL":
-        stats_data = [
-            ["Estadística", "Valor"],
-            ["Índice Fertilidad Promedio", f"{gdf_analisis['indice_fertilidad'].mean():.3f}"],
-            ["Nitrógeno Promedio (kg/ha)", f"{gdf_analisis['nitrogeno'].mean():.1f}"],
-            ["Fósforo Promedio (kg/ha)", f"{gdf_analisis['fosforo'].mean():.1f}"],
-            ["Potasio Promedio (kg/ha)", f"{gdf_analisis['potasio'].mean():.1f}"],
-            ["Materia Orgánica Promedio (%)", f"{gdf_analisis['materia_organica'].mean():.1f}"],
-            ["NDVI Promedio", f"{gdf_analisis['ndvi'].mean():.3f}"]
-        ]
-    elif analisis_tipo == "ANÁLISIS DE TEXTURA" and gdf_textura is not None:
-        stats_data = [
-            ["Estadística", "Valor"],
-            ["Textura Predominante", gdf_textura['textura_suelo'].mode()[0] if len(gdf_textura) > 0 else "N/A"],
-            ["Adecuación Promedio", f"{gdf_textura['adecuacion_textura'].mean():.1%}"],
-            ["Arena Promedio (%)", f"{gdf_textura['arena'].mean():.1f}"],
-            ["Limo Promedio (%)", f"{gdf_textura['limo'].mean():.1f}"],
-            ["Arcilla Promedio (%)", f"{gdf_textura['arcilla'].mean():.1f}"],
-            ["Agua Disponible Promedio (mm/m)", f"{gdf_textura['agua_disponible'].mean():.0f}"]
-        ]
+    for key, value in datos_clima.items():
+        gdf_analisis[key] = value
+    for key, value in datos_planetscope.items():
+        gdf_analisis[key] = value
+    if 'id_zona' not in gdf_analisis.columns:
+        gdf_analisis['id_zona'] = gdf_analisis.index + 1
+    return gdf_analisis
+
+# ✅ FUNCIÓN: mostrar_clima_detalles
+def mostrar_clima_detalles():
+    """Muestra análisis climático detallado con datos de NASA POWER"""
+    if not st.session_state.get('datos_clima'):
+        st.warning("⚠️ No hay datos climáticos disponibles.")
+        return
+        
+    clima = st.session_state.datos_clima
+    gdf = st.session_state.gdf_analisis
+    
+    st.markdown("## ☀️🌧️ Análisis Climático - NASA POWER")
+    if st.button("⬅️ Volver", key="volver_clima"):
+        st.session_state.analisis_completado = False
+        st.rerun()
+
+    # Métricas principales
+    cols = st.columns(4)
+    with cols[0]:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">☀️ Radiación Solar</div>
+            <div class="metric-value">{clima['radiacion_solar']:.1f} MJ/m²/día</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with cols[1]:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">🌧️ Precip. Diaria</div>
+            <div class="metric-value">{clima['precipitacion']:.1f} mm/día</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with cols[2]:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">💨 Viento (10m)</div>
+            <div class="metric-value">{clima['velocidad_viento']:.1f} m/s</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with cols[3]:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">💧 Humedad Relativa</div>
+            <div class="metric-value">{clima['humedad_relativa']:.1f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Análisis contextual
+    st.markdown("### 📊 Interpretación Agroclimática")
+    
+    # Precipitación mensual
+    precip_mensual = clima['precipitacion'] * 30
+    if precip_mensual < 100:
+        st.error(f"🚨 **Precipitación mensual baja**: {precip_mensual:.0f} mm/mes. Riego suplementario recomendado.")
+    elif precip_mensual > 300:
+        st.warning(f"⚠️ **Precipitación mensual alta**: {precip_mensual:.0f} mm/mes. Riesgo de lixiviación y encharcamiento.")
     else:
-        avg_rec = gdf_analisis['recomendacion_npk'].mean()
-        total_rec = (gdf_analisis['recomendacion_npk'] * gdf_analisis['area_ha']).sum()
-        stats_data = [
-            ["Estadística", "Valor"],
-            [f"Recomendación {nutriente} Promedio (kg/ha)", f"{avg_rec:.1f}"],
-            [f"Total {nutriente} Requerido (kg)", f"{total_rec:.1f}"],
-            ["Nitrógeno Promedio (kg/ha)", f"{gdf_analisis['nitrogeno'].mean():.1f}"],
-            ["Fósforo Promedio (kg/ha)", f"{gdf_analisis['fosforo'].mean():.1f}"],
-            ["Potasio Promedio (kg/ha)", f"{gdf_analisis['potasio'].mean():.1f}"]
-        ]
-    stats_table = Table(stats_data, colWidths=[3*inch, 2*inch])
-    stats_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    story.append(stats_table)
-    story.append(Spacer(1, 20))
-    if analisis_tipo == "FERTILIDAD ACTUAL":
-        story.append(Paragraph("DISTRIBUCIÓN DE CATEGORÍAS DE FERTILIDAD", heading_style))
-        cat_dist = gdf_analisis['categoria'].value_counts()
-        cat_data = [["Categoría", "Número de Zonas", "Porcentaje"]]
-        total_zonas = len(gdf_analisis)
-        for categoria, count in cat_dist.items():
-            porcentaje = (count / total_zonas) * 100
-            cat_data.append([categoria, str(count), f"{porcentaje:.1f}%"])
-        cat_table = Table(cat_data, colWidths=[2*inch, 1.5*inch, 1.5*inch])
-        cat_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(cat_table)
-        story.append(Spacer(1, 20))
-    story.append(PageBreak())
-    story.append(Paragraph("MAPA DE ANÁLISIS", heading_style))
-    if analisis_tipo == "FERTILIDAD ACTUAL":
-        titulo_mapa = f"Fertilidad Actual - {cultivo.replace('_', ' ').title()}"
-        columna_visualizar = 'indice_fertilidad'
-    elif analisis_tipo == "ANÁLISIS DE TEXTURA" and gdf_textura is not None:
-        titulo_mapa = f"Textura del Suelo - {cultivo.replace('_', ' ').title()}"
-        columna_visualizar = 'textura_suelo'
-        gdf_analisis = gdf_textura
+        st.success(f"✅ **Precipitación mensual óptima**: {precip_mensual:.0f} mm/mes.")
+    
+    # Radiación solar
+    if clima['radiacion_solar'] < 12:
+        st.warning("⚠️ **Radiación solar baja**: Puede limitar la fotosíntesis.")
+    elif clima['radiacion_solar'] > 22:
+        st.warning("⚠️ **Radiación solar alta**: Riesgo de estrés fotoinhibitorio.")
     else:
-        titulo_mapa = f"Recomendación {nutriente} - {cultivo.replace('_', ' ').title()}"
-        columna_visualizar = 'recomendacion_npk'
-    mapa_buffer = crear_mapa_estatico(
-        gdf_analisis, titulo_mapa, columna_visualizar, analisis_tipo, nutriente
-    )
-    if mapa_buffer:
-        mapa_buffer.seek(0)
-        img = Image(mapa_buffer, width=6*inch, height=4*inch)
-        story.append(img)
-        story.append(Spacer(1, 10))
-        story.append(Paragraph(f"Figura 1: {titulo_mapa}", normal_style))
-    story.append(Spacer(1, 20))
-    story.append(Paragraph("RESULTADOS POR ZONA (PRIMERAS 10 ZONAS)", heading_style))
-    if analisis_tipo == "ANÁLISIS DE TEXTURA" and gdf_textura is not None:
-        columnas_tabla = ['id_zona', 'area_ha', 'textura_suelo', 'adecuacion_textura', 'arena', 'limo', 'arcilla']
-        df_tabla = gdf_textura[columnas_tabla].head(10).copy()
+        st.success("✅ **Radiación solar óptima** para cultivos tropicales.")
+
+    # Humedad relativa
+    if clima['humedad_relativa'] < 60:
+        st.warning("⚠️ **Humedad relativa baja**: Mayor demanda de riego y riesgo de estrés hídrico.")
+    elif clima['humedad_relativa'] > 85:
+        st.warning("⚠️ **Humedad relativa alta**: Mayor riesgo de enfermedades fúngicas.")
     else:
-        columnas_tabla = ['id_zona', 'area_ha', 'categoria', 'prioridad']
-        if analisis_tipo == "FERTILIDAD ACTUAL":
-            columnas_tabla.extend(['indice_fertilidad', 'nitrogeno', 'fosforo', 'potasio', 'materia_organica'])
-        else:
-            columnas_tabla.extend(['recomendacion_npk', 'deficit_npk', 'nitrogeno', 'fosforo', 'potasio'])
-        df_tabla = gdf_analisis[columnas_tabla].head(10).copy()
-    df_tabla['area_ha'] = df_tabla['area_ha'].round(3)
-    if analisis_tipo == "FERTILIDAD ACTUAL":
-        df_tabla['indice_fertilidad'] = df_tabla['indice_fertilidad'].round(3)
-    elif analisis_tipo == "ANÁLISIS DE TEXTURA":
-        df_tabla['adecuacion_textura'] = df_tabla['adecuacion_textura'].round(3)
-        df_tabla['arena'] = df_tabla['arena'].round(1)
-        df_tabla['limo'] = df_tabla['limo'].round(1)
-        df_tabla['arcilla'] = df_tabla['arcilla'].round(1)
-    else:
-        df_tabla['recomendacion_npk'] = df_tabla['recomendacion_npk'].round(1)
-        df_tabla['deficit_npk'] = df_tabla['deficit_npk'].round(1)
-    if 'nitrogeno' in df_tabla.columns:
-        df_tabla['nitrogeno'] = df_tabla['nitrogeno'].round(1)
-    if 'fosforo' in df_tabla.columns:
-        df_tabla['fosforo'] = df_tabla['fosforo'].round(1)
-    if 'potasio' in df_tabla.columns:
-        df_tabla['potasio'] = df_tabla['potasio'].round(1)
-    if 'materia_organica' in df_tabla.columns:
-        df_tabla['materia_organica'] = df_tabla['materia_organica'].round(1)
-    table_data = [df_tabla.columns.tolist()]
-    for _, row in df_tabla.iterrows():
-        table_data.append(row.tolist())
-    zona_table = Table(table_data, colWidths=[0.5*inch] + [0.7*inch] * (len(columnas_tabla)-1))
-    zona_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 7),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
-    ]))
-    story.append(zona_table)
-    if len(gdf_analisis) > 10:
-        story.append(Spacer(1, 5))
-        story.append(Paragraph(f"* Mostrando 10 de {len(gdf_analisis)} zonas totales. Consulte el archivo CSV para todos los datos.", 
-                             ParagraphStyle('Small', parent=normal_style, fontSize=8)))
-    story.append(Spacer(1, 20))
-    story.append(PageBreak())
-    story.append(Paragraph("RECOMENDACIONES AGROECOLÓGICAS", heading_style))
-    if analisis_tipo == "ANÁLISIS DE TEXTURA" and gdf_textura is not None:
-        textura_predominante = gdf_textura['textura_suelo'].mode()[0] if len(gdf_textura) > 0 else "Franco"
-        adecuacion_promedio = gdf_textura['adecuacion_textura'].mean()
-        if adecuacion_promedio >= 0.8:
-            enfoque = "ENFOQUE: MANTENIMIENTO - Textura adecuada"
-        elif adecuacion_promedio >= 0.6:
-            enfoque = "ENFOQUE: MEJORA MODERADA - Ajustes menores necesarios"
-        else:
-            enfoque = "ENFOQUE: MEJORA INTEGRAL - Enmiendas requeridas"
-        story.append(Paragraph(f"<b>Enfoque Principal:</b> {enfoque}", normal_style))
-        story.append(Spacer(1, 10))
-        recomendaciones_textura = RECOMENDACIONES_TEXTURA.get(textura_predominante, [])
-        story.append(Paragraph(f"<b>Recomendaciones para textura {textura_predominante}:</b>", normal_style))
-        for rec in recomendaciones_textura[:4]:
-            story.append(Paragraph(f"• {rec}", normal_style))
-    else:
-        categoria_promedio = gdf_analisis['categoria'].mode()[0] if len(gdf_analisis) > 0 else "MEDIA"
-        if categoria_promedio in ["MUY BAJA", "BAJA"]:
-            enfoque = "ENFOQUE: RECUPERACIÓN Y REGENERACIÓN - Intensidad: Alta"
-        elif categoria_promedio in ["MEDIA"]:
-            enfoque = "ENFOQUE: MANTENIMIENTO Y MEJORA - Intensidad: Media"
-        else:
-            enfoque = "ENFOQUE: CONSERVACIÓN Y OPTIMIZACIÓN - Intensidad: Baja"
-        story.append(Paragraph(f"<b>Enfoque Principal:</b> {enfoque}", normal_style))
-        story.append(Spacer(1, 10))
-        recomendaciones = RECOMENDACIONES_AGROECOLOGICAS.get(cultivo, {})
-        for categoria_rec, items in recomendaciones.items():
-            story.append(Paragraph(f"<b>{categoria_rec.replace('_', ' ').title()}:</b>", normal_style))
-            for item in items[:3]:
-                story.append(Paragraph(f"• {item}", normal_style))
-            story.append(Spacer(1, 5))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph("<b>PLAN DE IMPLEMENTACIÓN:</b>", normal_style))
-    planes = [
-        ("INMEDIATO (0-15 días)", [
-            "Preparación del terreno",
-            "Siembra de abonos verdes", 
-            "Aplicación de biofertilizantes"
-        ]),
-        ("CORTO PLAZO (1-3 meses)", [
-            "Establecimiento coberturas",
-            "Monitoreo inicial",
-            "Ajustes de manejo"
-        ]),
-        ("MEDIANO PLAZO (3-12 meses)", [
-            "Evaluación de resultados",
-            "Diversificación",
-            "Optimización del sistema"
-        ])
-    ]
-    for periodo, acciones in planes:
-        story.append(Paragraph(f"<b>{periodo}:</b>", normal_style))
-        for accion in acciones:
-            story.append(Paragraph(f"• {accion}", normal_style))
-        story.append(Spacer(1, 5))
-    story.append(Spacer(1, 20))
-    story.append(Paragraph("INFORMACIÓN ADICIONAL", heading_style))
-    story.append(Paragraph("Este informe fue generado automáticamente por el Sistema de Análisis Agrícola GEE.", normal_style))
-    story.append(Paragraph("Para consultas técnicas o información detallada, contacte con el departamento técnico.", normal_style))
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
+        st.success("✅ **Humedad relativa adecuada** para el desarrollo vegetal.")
+
+    # Mapa si hay variación (opcional, para zonas múltiples)
+    if gdf is not None and len(gdf) > 1:
+        st.markdown("### 🌍 Distribución Espacial del Clima")
+        tab1, tab2, tab3, tab4 = st.tabs(["Radiación", "Precipitación", "Viento", "Humedad"])
+        
+        # Asegurar que los datos climáticos están en el GeoDataFrame
+        for key, value in clima.items():
+            gdf[key] = value
+
+        with tab1:
+            mapa_rad = crear_mapa_interactivo_esri(gdf, "Radiación Solar", 'radiacion_solar', "CLIMÁTICO", "RAD")
+            st_folium(mapa_rad, width=700, height=400)
+        with tab2:
+            mapa_precip = crear_mapa_interactivo_esri(gdf, "Precipitación Diaria", 'precipitacion', "CLIMÁTICO", "PRECIP")
+            st_folium(mapa_precip, width=700, height=400)
+        with tab3:
+            mapa_viento = crear_mapa_interactivo_esri(gdf, "Velocidad del Viento", 'velocidad_viento', "CLIMÁTICO", "VIENTO")
+            st_folium(mapa_viento, width=700, height=400)
+        with tab4:
+            mapa_humedad = crear_mapa_interactivo_esri(gdf, "Humedad Relativa", 'humedad_relativa', "CLIMÁTICO", "HUMEDAD")
+            st_folium(mapa_humedad, width=700, height=400)
+
+    # Tabla de datos
+    st.markdown("### 📋 Datos Climáticos por Zona")
+    if gdf is not None:
+        cols_clima = ['id_zona', 'area_ha', 'radiacion_solar', 'precipitacion', 'velocidad_viento', 'humedad_relativa']
+        df_clima = gdf[cols_clima].copy()
+        df_clima['precip_mensual_mm'] = df_clima['precipitacion'] * 30
+        df_clima = df_clima.round(2)
+        st.dataframe(df_clima, use_container_width=True)
+        
+        # Gráfico interactivo
+        st.markdown("### 📈 Comparativa Climática")
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=df_clima['id_zona'], y=df_clima['radiacion_solar'], name='Radiación (MJ/m²/día)', yaxis='y', offsetgroup=1))
+        fig.add_trace(go.Bar(x=df_clima['id_zona'], y=df_clima['precipitacion']*30, name='Precip. Mensual (mm)', yaxis='y2', offsetgroup=2))
+        fig.update_layout(
+            title="Radiación Solar vs Precipitación Mensual por Zona",
+            xaxis_title="Zona",
+            yaxis=dict(title="Radiación Solar (MJ/m²/día)", side="left"),
+            yaxis2=dict(title="Precipitación Mensual (mm)", side="right", overlaying="y"),
+            barmode='group'
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Recomendaciones
+    st.markdown("### 💡 Recomendaciones Climáticas")
+    cultivo = st.session_state.cultivo
+    
+    if cultivo == "PALMA_ACEITERA":
+        st.markdown("""
+        - **Palma aceitera**: Óptima con 1500-2500 mm/año de precipitación. Riego necesario si < 100 mm/mes.
+        - **Viento**: Velocidades > 3 m/s pueden afectar polinización; considerar cortavientos.
+        - **Radiación**: Requiere alta radiación (> 15 MJ/m²/día) para máximo rendimiento.
+        """)
+    elif cultivo == "CACAO":
+        st.markdown("""
+        - **Cacao**: Prefiere sombra parcial; radiación > 20 MJ/m²/día puede requerir sombra adicional.
+        - **Humedad**: Óptima entre 70-90%; < 60% requiere riego y mulching.
+        - **Precipitación**: Ideal 1500-2500 mm/año distribuidos uniformemente.
+        """)
+    else:  # BANANO
+        st.markdown("""
+        - **Banano**: Alta demanda hídrica (2000-3000 mm/año); riego esencial si precipitación < 150 mm/mes.
+        - **Viento**: Muy sensible; velocidades > 2 m/s pueden causar daño; usar cortavientos.
+        - **Humedad**: Prefiere > 80%; condiciones secas aumentan estrés hídrico.
+        """)
+
+    # Descargas
+    st.markdown("### 💾 Descargar Datos Climáticos")
+    col1, col2, col3 = st.columns(3)
+    if gdf is not None:
+        with col1:
+            csv = df_clima.to_csv(index=False)
+            st.download_button("📥 CSV", csv, "datos_climaticos.csv", "text/csv")
+        with col2:
+            geojson = gdf.to_json()
+            st.download_button("🗺️ GeoJSON", geojson, "datos_climaticos.geojson", "application/json")
+        with col3:
+            # PDF (puedes implementar una función específica o usar la existente)
+            st.info("📄 PDF disponible en 'Generar Informe Completo'")
 
 # FUNCIÓN PARA MOSTRAR RESULTADOS DE TEXTURA
 def mostrar_resultados_textura():
@@ -1678,45 +1758,6 @@ def mostrar_resultados_principales():
                     mime="application/pdf"
                 )
 
-# FUNCIÓN PARA OBTENER DATOS DE NASA POWER
-def obtener_datos_nasa_power(lat, lon, mes_analisis):
-    try:
-        mes_num = {
-            "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5, "JUNIO": 6,
-            "JULIO": 7, "AGOSTO": 8, "SEPTIEMBRE": 9, "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
-        }[mes_analisis]
-        año = datetime.now().year
-        start = f"{año}{mes_num:02d}01"
-        end = f"{año}{mes_num+1:02d}01" if mes_num < 12 else f"{año+1}0101"
-        url = "https://power.larc.nasa.gov/api/temporal/daily/point"
-        params = {
-            "parameters": "ALLSKY_SFC_SW_DWN,PRECTOTCORR,WS10M",
-            "community": "ag",
-            "longitude": lon,
-            "latitude": lat,
-            "start": start,
-            "end": end,
-            "format": "json"
-        }
-        response = requests.get(url, params=params, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            dias = data['properties']['parameter']
-            rad_solar = np.nanmean(list(dias['ALLSKY_SFC_SW_DWN'].values()))
-            precip = np.nanmean(list(dias['PRECTOTCORR'].values()))
-            viento = np.nanmean(list(dias['WS10M'].values()))
-            return {
-                'radiacion_solar': float(rad_solar) if not np.isnan(rad_solar) else 16.0,
-                'precipitacion': float(precip) if not np.isnan(precip) else 6.0,
-                'velocidad_viento': float(viento) if not np.isnan(viento) else 2.5
-            }
-    except:
-        return {
-            'radiacion_solar': 16.0,
-            'precipitacion': 6.0,
-            'velocidad_viento': 2.5
-        }
-
 # FUNCIÓN PARA OBTENER DATOS DE PLANETSCOPE (simulado)
 def obtener_datos_planetscope(lat, lon, api_key=None):
     np.random.seed(abs(hash(f"{lat:.4f}_{lon:.4f}")) % (2**32))
@@ -1840,7 +1881,7 @@ def mostrar_potencial_cosecha():
                             if potencial <= 0: continue
                             peso = np.clip(potencial / 30.0, 0.1, 1.0)
                             heat_data.append([lat, lon, peso])
-                        if not heat_data:
+                        if not heat_
                             st.warning("⚠️ No se generaron puntos válidos.")
                             return
                         centroid = gdf.geometry.unary_union.centroid
@@ -1935,6 +1976,256 @@ def mostrar_potencial_cosecha():
         geojson = gdf.to_json()
         st.download_button("🗺️ Descargar GeoJSON", data=geojson, file_name=f"potencial_cosecha_{datetime.now().strftime('%Y%m%d_%H%M')}.geojson", mime="application/json")
 
+# FUNCIÓN PARA GENERAR PDF
+def generar_informe_pdf(gdf_analisis, cultivo, analisis_tipo, nutriente, mes_analisis, area_total, gdf_textura=None):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*inch)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.darkgreen,
+        spaceAfter=30,
+        alignment=1
+    )
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.darkblue,
+        spaceAfter=12,
+        spaceBefore=12
+    )
+    normal_style = styles['Normal']
+    story = []
+    story.append(Paragraph("INFORME DE ANÁLISIS AGRÍCOLA", title_style))
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("INFORMACIÓN GENERAL", heading_style))
+    info_data = [
+        ["Cultivo:", cultivo.replace('_', ' ').title()],
+        ["Tipo de Análisis:", analisis_tipo],
+        ["Mes de Análisis:", mes_analisis],
+        ["Área Total:", f"{area_total:.2f} ha"],
+        ["Fecha de Generación:", datetime.now().strftime("%d/%m/%Y %H:%M")]
+    ]
+    if analisis_tipo == "RECOMENDACIONES NPK":
+        info_data.insert(2, ["Nutriente Analizado:", nutriente])
+    info_table = Table(info_data, colWidths=[2*inch, 3*inch])
+    info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("ESTADÍSTICAS DEL ANÁLISIS", heading_style))
+    if analisis_tipo == "FERTILIDAD ACTUAL":
+        stats_data = [
+            ["Estadística", "Valor"],
+            ["Índice Fertilidad Promedio", f"{gdf_analisis['indice_fertilidad'].mean():.3f}"],
+            ["Nitrógeno Promedio (kg/ha)", f"{gdf_analisis['nitrogeno'].mean():.1f}"],
+            ["Fósforo Promedio (kg/ha)", f"{gdf_analisis['fosforo'].mean():.1f}"],
+            ["Potasio Promedio (kg/ha)", f"{gdf_analisis['potasio'].mean():.1f}"],
+            ["Materia Orgánica Promedio (%)", f"{gdf_analisis['materia_organica'].mean():.1f}"],
+            ["NDVI Promedio", f"{gdf_analisis['ndvi'].mean():.3f}"]
+        ]
+    elif analisis_tipo == "ANÁLISIS DE TEXTURA" and gdf_textura is not None:
+        stats_data = [
+            ["Estadística", "Valor"],
+            ["Textura Predominante", gdf_textura['textura_suelo'].mode()[0] if len(gdf_textura) > 0 else "N/A"],
+            ["Adecuación Promedio", f"{gdf_textura['adecuacion_textura'].mean():.1%}"],
+            ["Arena Promedio (%)", f"{gdf_textura['arena'].mean():.1f}"],
+            ["Limo Promedio (%)", f"{gdf_textura['limo'].mean():.1f}"],
+            ["Arcilla Promedio (%)", f"{gdf_textura['arcilla'].mean():.1f}"],
+            ["Agua Disponible Promedio (mm/m)", f"{gdf_textura['agua_disponible'].mean():.0f}"]
+        ]
+    else:
+        avg_rec = gdf_analisis['recomendacion_npk'].mean()
+        total_rec = (gdf_analisis['recomendacion_npk'] * gdf_analisis['area_ha']).sum()
+        stats_data = [
+            ["Estadística", "Valor"],
+            [f"Recomendación {nutriente} Promedio (kg/ha)", f"{avg_rec:.1f}"],
+            [f"Total {nutriente} Requerido (kg)", f"{total_rec:.1f}"],
+            ["Nitrógeno Promedio (kg/ha)", f"{gdf_analisis['nitrogeno'].mean():.1f}"],
+            ["Fósforo Promedio (kg/ha)", f"{gdf_analisis['fosforo'].mean():.1f}"],
+            ["Potasio Promedio (kg/ha)", f"{gdf_analisis['potasio'].mean():.1f}"]
+        ]
+    stats_table = Table(stats_data, colWidths=[3*inch, 2*inch])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(stats_table)
+    story.append(Spacer(1, 20))
+    if analisis_tipo == "FERTILIDAD ACTUAL":
+        story.append(Paragraph("DISTRIBUCIÓN DE CATEGORÍAS DE FERTILIDAD", heading_style))
+        cat_dist = gdf_analisis['categoria'].value_counts()
+        cat_data = [["Categoría", "Número de Zonas", "Porcentaje"]]
+        total_zonas = len(gdf_analisis)
+        for categoria, count in cat_dist.items():
+            porcentaje = (count / total_zonas) * 100
+            cat_data.append([categoria, str(count), f"{porcentaje:.1f}%"])
+        cat_table = Table(cat_data, colWidths=[2*inch, 1.5*inch, 1.5*inch])
+        cat_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(cat_table)
+        story.append(Spacer(1, 20))
+    story.append(PageBreak())
+    story.append(Paragraph("MAPA DE ANÁLISIS", heading_style))
+    if analisis_tipo == "FERTILIDAD ACTUAL":
+        titulo_mapa = f"Fertilidad Actual - {cultivo.replace('_', ' ').title()}"
+        columna_visualizar = 'indice_fertilidad'
+    elif analisis_tipo == "ANÁLISIS DE TEXTURA" and gdf_textura is not None:
+        titulo_mapa = f"Textura del Suelo - {cultivo.replace('_', ' ').title()}"
+        columna_visualizar = 'textura_suelo'
+        gdf_analisis = gdf_textura
+    else:
+        titulo_mapa = f"Recomendación {nutriente} - {cultivo.replace('_', ' ').title()}"
+        columna_visualizar = 'recomendacion_npk'
+    mapa_buffer = crear_mapa_estatico(
+        gdf_analisis, titulo_mapa, columna_visualizar, analisis_tipo, nutriente
+    )
+    if mapa_buffer:
+        mapa_buffer.seek(0)
+        img = Image(mapa_buffer, width=6*inch, height=4*inch)
+        story.append(img)
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(f"Figura 1: {titulo_mapa}", normal_style))
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("RESULTADOS POR ZONA (PRIMERAS 10 ZONAS)", heading_style))
+    if analisis_tipo == "ANÁLISIS DE TEXTURA" and gdf_textura is not None:
+        columnas_tabla = ['id_zona', 'area_ha', 'textura_suelo', 'adecuacion_textura', 'arena', 'limo', 'arcilla']
+        df_tabla = gdf_textura[columnas_tabla].head(10).copy()
+    else:
+        columnas_tabla = ['id_zona', 'area_ha', 'categoria', 'prioridad']
+        if analisis_tipo == "FERTILIDAD ACTUAL":
+            columnas_tabla.extend(['indice_fertilidad', 'nitrogeno', 'fosforo', 'potasio', 'materia_organica'])
+        else:
+            columnas_tabla.extend(['recomendacion_npk', 'deficit_npk', 'nitrogeno', 'fosforo', 'potasio'])
+        df_tabla = gdf_analisis[columnas_tabla].head(10).copy()
+    df_tabla['area_ha'] = df_tabla['area_ha'].round(3)
+    if analisis_tipo == "FERTILIDAD ACTUAL":
+        df_tabla['indice_fertilidad'] = df_tabla['indice_fertilidad'].round(3)
+    elif analisis_tipo == "ANÁLISIS DE TEXTURA":
+        df_tabla['adecuacion_textura'] = df_tabla['adecuacion_textura'].round(3)
+        df_tabla['arena'] = df_tabla['arena'].round(1)
+        df_tabla['limo'] = df_tabla['limo'].round(1)
+        df_tabla['arcilla'] = df_tabla['arcilla'].round(1)
+    else:
+        df_tabla['recomendacion_npk'] = df_tabla['recomendacion_npk'].round(1)
+        df_tabla['deficit_npk'] = df_tabla['deficit_npk'].round(1)
+    if 'nitrogeno' in df_tabla.columns:
+        df_tabla['nitrogeno'] = df_tabla['nitrogeno'].round(1)
+    if 'fosforo' in df_tabla.columns:
+        df_tabla['fosforo'] = df_tabla['fosforo'].round(1)
+    if 'potasio' in df_tabla.columns:
+        df_tabla['potasio'] = df_tabla['potasio'].round(1)
+    if 'materia_organica' in df_tabla.columns:
+        df_tabla['materia_organica'] = df_tabla['materia_organica'].round(1)
+    table_data = [df_tabla.columns.tolist()]
+    for _, row in df_tabla.iterrows():
+        table_data.append(row.tolist())
+    zona_table = Table(table_data, colWidths=[0.5*inch] + [0.7*inch] * (len(columnas_tabla)-1))
+    zona_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.WHITE),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
+    ]))
+    story.append(zona_table)
+    if len(gdf_analisis) > 10:
+        story.append(Spacer(1, 5))
+        story.append(Paragraph(f"* Mostrando 10 de {len(gdf_analisis)} zonas totales. Consulte el archivo CSV para todos los datos.", 
+                             ParagraphStyle('Small', parent=normal_style, fontSize=8)))
+    story.append(Spacer(1, 20))
+    story.append(PageBreak())
+    story.append(Paragraph("RECOMENDACIONES AGROECOLÓGICAS", heading_style))
+    if analisis_tipo == "ANÁLISIS DE TEXTURA" and gdf_textura is not None:
+        textura_predominante = gdf_textura['textura_suelo'].mode()[0] if len(gdf_textura) > 0 else "Franco"
+        adecuacion_promedio = gdf_textura['adecuacion_textura'].mean()
+        if adecuacion_promedio >= 0.8:
+            enfoque = "ENFOQUE: MANTENIMIENTO - Textura adecuada"
+        elif adecuacion_promedio >= 0.6:
+            enfoque = "ENFOQUE: MEJORA MODERADA - Ajustes menores necesarios"
+        else:
+            enfoque = "ENFOQUE: MEJORA INTEGRAL - Enmiendas requeridas"
+        story.append(Paragraph(f"<b>Enfoque Principal:</b> {enfoque}", normal_style))
+        story.append(Spacer(1, 10))
+        recomendaciones_textura = RECOMENDACIONES_TEXTURA.get(textura_predominante, [])
+        story.append(Paragraph(f"<b>Recomendaciones para textura {textura_predominante}:</b>", normal_style))
+        for rec in recomendaciones_textura[:4]:
+            story.append(Paragraph(f"• {rec}", normal_style))
+    else:
+        categoria_promedio = gdf_analisis['categoria'].mode()[0] if len(gdf_analisis) > 0 else "MEDIA"
+        if categoria_promedio in ["MUY BAJA", "BAJA"]:
+            enfoque = "ENFOQUE: RECUPERACIÓN Y REGENERACIÓN - Intensidad: Alta"
+        elif categoria_promedio in ["MEDIA"]:
+            enfoque = "ENFPUEQUE: MANTENIMIENTO Y MEJORA - Intensidad: Media"
+        else:
+            enfoque = "ENFOQUE: CONSERVACIÓN Y OPTIMIZACIÓN - Intensidad: Baja"
+        story.append(Paragraph(f"<b>Enfoque Principal:</b> {enfoque}", normal_style))
+        story.append(Spacer(1, 10))
+        recomendaciones = RECOMENDACIONES_AGROECOLOGICAS.get(cultivo, {})
+        for categoria_rec, items in recomendaciones.items():
+            story.append(Paragraph(f"<b>{categoria_rec.replace('_', ' ').title()}:</b>", normal_style))
+            for item in items[:3]:
+                story.append(Paragraph(f"• {item}", normal_style))
+            story.append(Spacer(1, 5))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("<b>PLAN DE IMPLEMENTACIÓN:</b>", normal_style))
+    planes = [
+        ("INMEDIATO (0-15 días)", [
+            "Preparación del terreno",
+            "Siembra de abonos verdes", 
+            "Aplicación de biofertilizantes"
+        ]),
+        ("CORTO PLAZO (1-3 meses)", [
+            "Establecimiento coberturas",
+            "Monitoreo inicial",
+            "Ajustes de manejo"
+        ]),
+        ("MEDIANO PLAZO (3-12 meses)", [
+            "Evaluación de resultados",
+            "Diversificación",
+            "Optimización del sistema"
+        ])
+    ]
+    for periodo, acciones in planes:
+        story.append(Paragraph(f"<b>{periodo}:</b>", normal_style))
+        for accion in acciones:
+            story.append(Paragraph(f"• {accion}", normal_style))
+        story.append(Spacer(1, 5))
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("INFORMACIÓN ADICIONAL", heading_style))
+    story.append(Paragraph("Este informe fue generado automáticamente por el Sistema de Análisis Agrícola GEE.", normal_style))
+    story.append(Paragraph("Para consultas técnicas o información detallada, contacte con el departamento técnico.", normal_style))
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 # INTERFAZ PRINCIPAL
 def main():
     if 'gdf_original' not in st.session_state:
@@ -1989,16 +2280,19 @@ def main():
     if st.session_state.analisis_completado:
         st.markdown("### 📊 Seleccione el tipo de análisis a visualizar")
         opcion = st.selectbox("🔍 Tipo de análisis",
-                            ["ANÁLISIS PRINCIPAL (Fertilidad)",
-                             "ANÁLISIS DE TEXTURA",
-                             "POTENCIAL DE COSECHA (Palma)"],
-                            key="tipo_analisis")
+                              ["ANÁLISIS PRINCIPAL (Fertilidad)",
+                               "ANÁLISIS DE TEXTURA",
+                               "POTENCIAL DE COSECHA (Palma)",
+                               "ANÁLISIS CLIMÁTICO (NASA POWER)"],  # ✅ NUEVA OPCIÓN
+                              key="tipo_analisis")
         if opcion == "ANÁLISIS PRINCIPAL (Fertilidad)":
             mostrar_resultados_principales()
         elif opcion == "ANÁLISIS DE TEXTURA":
             mostrar_resultados_textura()
         elif opcion == "POTENCIAL DE COSECHA (Palma)":
             mostrar_potencial_cosecha()
+        elif opcion == "ANÁLISIS CLIMÁTICO (NASA POWER)":  # ✅ NUEVO
+            mostrar_clima_detalles()
 
 if __name__ == "__main__":
     main()
