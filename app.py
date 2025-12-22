@@ -104,7 +104,7 @@ FACTORES_N_MES = {
 }
 FACTORES_P_MES = {
     "ENERO": 1.0, "FEBRERO": 1.0, "MARZO": 1.05, "ABRIL": 1.1,
-    "MAYO": 1.15, "JUNIO": 1.1, "JULio": 1.05, "AGOSTO": 1.0,
+    "MAYO": 1.15, "JUNIO": 1.1, "JULIO": 1.05, "AGOSTO": 1.0,
     "SEPTIEMBRE": 1.0, "OCTUBRE": 1.05, "NOVIEMBRE": 1.1, "DICIEMBRE": 1.05
 }
 FACTORES_K_MES = {
@@ -2181,227 +2181,616 @@ def mostrar_potencial_cosecha():
     - Humedad relativa 75-85%
     """)
 
-def mostrar_modo_demo():
-    st.markdown("### 🚀 Modo Demostración")
-    st.info("""
-    **Para usar la aplicación:**
-    1. Sube un archivo ZIP con el shapefile de tu parcela
-    2. Selecciona el cultivo y tipo de análisis
-    3. Configura los parámetros en el sidebar
-    4. Ejecuta el análisis GEE
+# ============================================================================
+# NUEVO: DASHBOARD COMPLETO CON RESUMEN
+# ============================================================================
 
-    **NUEVO:**
-    - 🌍 Datos climáticos de NASA POWER (radiación, lluvia, viento)
-    - 🛰️ Datos simulados de PlanetScope (NDVI, EVI, LAI)
-    - 🌴 Potencial de cosecha de palma aceitera
-    - 📊 Fertilidad, textura y agroecología
-    - 🔥 Mapas de calor para visualización avanzada
-
-    **📁 El shapefile debe incluir:**
-    - .shp (geometrías)
-    - .shx (índice)
-    - .dbf (atributos)
-    - .prj (sistema de coordenadas)
-    """)
-    if st.button("🎯 Cargar Datos de Demostración", type="primary"):
-        st.session_state.datos_demo = True
-        poligono_ejemplo = Polygon([
-            [-74.1, 4.6], [-74.0, 4.6], [-74.0, 4.7], [-74.1, 4.7], [-74.1, 4.6]
-        ])
-        gdf_demo = gpd.GeoDataFrame(
-            {'id': [1], 'nombre': ['Parcela Demo']},
-            geometry=[poligono_ejemplo],
-            crs="EPSG:4326"
-        )
-        st.session_state.gdf_original = gdf_demo
+def mostrar_dashboard_completo():
+    """Muestra un dashboard completo con resumen de todos los análisis"""
+    if not st.session_state.get('analisis_completado', False):
+        st.warning("No hay análisis completados para mostrar en el dashboard")
+        return
+    
+    st.markdown("# 📊 DASHBOARD COMPLETO - RESUMEN DE ANÁLISIS")
+    st.markdown("### 🌟 Resumen ejecutivo de todos los análisis realizados")
+    
+    # Botón para volver a configuración
+    if st.button("⬅️ Volver a Configuración", key="volver_dashboard"):
+        st.session_state.analisis_completado = False
         st.rerun()
-
-def mostrar_configuracion_parcela():
-    gdf_original = st.session_state.gdf_original
-    cultivo = st.session_state.cultivo
-    n_divisiones = st.session_state.n_divisiones
-    area_total = calcular_superficie(gdf_original)
-    num_poligonos = len(gdf_original) if gdf_original is not None else 0
-    st.success("✅ Parcela cargada correctamente")
-    col1, col2, col3 = st.columns(3)
+    
+    # Información general
+    st.markdown("## 📋 INFORMACIÓN GENERAL")
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("📐 Área Total", f"{area_total:.2f} ha")
+        st.metric("🌱 Cultivo", st.session_state.cultivo.replace('_', ' ').title())
     with col2:
-        st.metric("🔢 Número de Polígonos", num_poligonos)
+        st.metric("📐 Área Total", f"{st.session_state.area_total:.2f} ha")
     with col3:
-        st.metric("🌱 Cultivo", cultivo.replace('_', ' ').title())
-    st.markdown("### 🗺️ Visualizador de Parcela")
-    st.info("🗺️ **Mapa base:** OpenStreetMap. Usa el control de capas para cambiar a ESRI Satélite o otras opciones.")
-    mapa_parcela = crear_mapa_visualizador_parcela(gdf_original)
-    st_folium(mapa_parcela, width=800, height=500)
-    st.markdown("### 📊 División en Zonas de Manejo")
-    st.info(f"La parcela se dividirá en **{n_divisiones} zonas** para análisis detallado")
-    if st.button("🚀 Ejecutar Análisis GEE Completo", type="primary"):
-        with st.spinner("🔄 Dividiendo parcela en zonas..."):
-            gdf_zonas = dividir_parcela_en_zonas(gdf_original, n_divisiones)
-            st.session_state.gdf_zonas = gdf_zonas
-        with st.spinner("🔬 Realizando análisis GEE..."):
-            analisis_tipo = st.session_state.analisis_tipo
-            nutriente = st.session_state.nutriente
-            mes_analisis = st.session_state.mes_analisis
-            cultivo = st.session_state.cultivo
-            
-            if analisis_tipo == "ANÁLISIS DE TEXTURA":
-                gdf_textura = analizar_textura_suelo(gdf_zonas, cultivo, mes_analisis)
-                st.session_state.analisis_textura = gdf_textura
-                st.session_state.gdf_analisis = gdf_zonas
-            else:
-                gdf_fert = calcular_indices_gee(gdf_zonas, cultivo, mes_analisis, analisis_tipo, nutriente)
-                st.session_state.gdf_analisis = gdf_fert
-                
-                gdf_textura = analizar_textura_suelo(gdf_zonas, cultivo, mes_analisis)
-                st.session_state.analisis_textura = gdf_textura
-                
-                if cultivo == "PALMA_ACEITERA" and analisis_tipo in ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK"]:
-                    centroid = gdf_original.geometry.centroid.iloc[0]
-                    datos_clima = obtener_datos_nasa_power(centroid.y, centroid.x, mes_analisis)
-                    datos_planetscope = obtener_datos_planetscope(centroid.y, centroid.x)
-                    gdf_fert = calcular_potencial_cosecha(gdf_fert, datos_clima, datos_planetscope, cultivo)
-                    st.session_state.gdf_analisis = gdf_fert
-                    st.session_state.datos_clima = datos_clima
-                    st.session_state.datos_planetscope = datos_planetscope
-                    
-            st.session_state.area_total = area_total
-            st.session_state.analisis_completado = True
-        st.rerun()
-
-# ============================================================================
-# INICIALIZACIÓN DE SESSION_STATE
-# ============================================================================
-if 'analisis_completado' not in st.session_state:
-    st.session_state.analisis_completado = False
-if 'gdf_original' not in st.session_state:
-    st.session_state.gdf_original = None
-if 'gdf_analisis' not in st.session_state:
-    st.session_state.gdf_analisis = None
-if 'analisis_textura' not in st.session_state:
-    st.session_state.analisis_textura = None
-if 'area_total' not in st.session_state:
-    st.session_state.area_total = 0.0
-if 'datos_demo' not in st.session_state:
-    st.session_state.datos_demo = False
-if 'cultivo' not in st.session_state:
-    st.session_state.cultivo = "PALMA_ACEITERA"
-if 'analisis_tipo' not in st.session_state:
-    st.session_state.analisis_tipo = "FERTILIDAD ACTUAL"
-if 'nutriente' not in st.session_state:
-    st.session_state.nutriente = "NITRÓGENO"
-if 'mes_analisis' not in st.session_state:
-    st.session_state.mes_analisis = "ENERO"
-if 'n_divisiones' not in st.session_state:
-    st.session_state.n_divisiones = 24
-if 'datos_clima' not in st.session_state:
-    st.session_state.datos_clima = None
-if 'datos_planetscope' not in st.session_state:
-    st.session_state.datos_planetscope = None
-if 'gdf_zonas' not in st.session_state:
-    st.session_state.gdf_zonas = None
-
-# ============================================================================
-# SIDEBAR
-# ============================================================================
-with st.sidebar:
-    st.header("⚙️ Configuración")
-    st.session_state.cultivo = st.selectbox("Cultivo:", 
-                          ["PALMA_ACEITERA", "CACAO", "BANANO"])
-    st.session_state.analisis_tipo = st.selectbox("Tipo de Análisis:", 
-                               ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK", "ANÁLISIS DE TEXTURA"])
+        st.metric("📅 Mes de Análisis", st.session_state.mes_analisis)
+    with col4:
+        st.metric("🔢 Número de Zonas", len(st.session_state.gdf_analisis) if st.session_state.gdf_analisis is not None else 0)
     
-    # Solo mostrar selector de nutriente si el tipo de análisis es RECOMENDACIONES NPK
-    if st.session_state.analisis_tipo == "RECOMENDACIONES NPK":
-        st.session_state.nutriente = st.selectbox("Nutriente:", ["NITRÓGENO", "FÓSFORO", "POTASIO"])
-    else:
-        st.session_state.nutriente = "NITRÓGENO"  # Valor por defecto
+    st.markdown("---")
     
-    st.session_state.mes_analisis = st.selectbox("Mes de Análisis:", 
-                               ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-                                "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"])
-    st.session_state.n_divisiones = st.slider("Número de zonas de manejo:", min_value=16, max_value=32, value=24)
-    st.subheader("📤 Subir Parcela")
-    uploaded_file = st.file_uploader("Subir ZIP con shapefile o archivo KML de tu parcela", type=['zip', 'kml'])
-    
-    st.subheader("🛰️ PlanetScope (opcional)")
-    planet_api_key = st.text_input("API Key de Planet (opcional)", type="password")
-    st.info("Si no proporcionas una API key, se usarán datos simulados realistas.")
-    
-    if st.button("🔄 Reiniciar Análisis"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
-
-# ============================================================================
-# MAIN
-# ============================================================================
-def main():
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🌍 NASA POWER + PlanetScope")
-    st.sidebar.info("""
-    **Datos integrados:**
-    - ☀️ Radiación solar (MJ/m²/día)
-    - 🌧️ Precipitación (mm/día)
-    - 💨 Velocidad del viento (m/s)
-    - 🛰️ NDVI, EVI, LAI (PlanetScope)
-    
-    **NUEVO: Mapas de Calor**
-    - 🔥 Visualización de densidad de potencial
-    - 📊 Análisis espacial avanzado
-    - 🎯 Identificación de zonas críticas
-    
-    **Solo para PALMA ACEITERA:**
-    - 📈 Potencial de cosecha (ton/ha/año)
-    """)
-    
-    if uploaded_file is not None and not st.session_state.analisis_completado:
-        with st.spinner("🔄 Procesando archivo..."):
-            gdf_original = procesar_archivo(uploaded_file)
-            if gdf_original is not None:
-                st.session_state.gdf_original = gdf_original
-                st.session_state.datos_demo = False
-    if st.session_state.datos_demo and st.session_state.gdf_original is None:
-        poligono_ejemplo = Polygon([
-            [-74.1, 4.6], [-74.0, 4.6], [-74.0, 4.7], [-74.1, 4.7], [-74.1, 4.6]
-        ])
-        gdf_demo = gpd.GeoDataFrame(
-            {'id': [1], 'nombre': ['Parcela Demo']},
-            geometry=[poligono_ejemplo],
-            crs="EPSG:4326"
-        )
-        st.session_state.gdf_original = gdf_demo
+    # Sección 1: FERTILIDAD
+    st.markdown("## 🌿 ANÁLISIS DE FERTILIDAD DEL SUELO")
+    if st.session_state.gdf_analisis is not None:
+        gdf = st.session_state.gdf_analisis
+        col1, col2, col3, col4 = st.columns(4)
         
-    if st.session_state.analisis_completado:
-        cultivo = st.session_state.cultivo
-        if cultivo == "PALMA_ACEITERA" and st.session_state.analisis_tipo in ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK"]:
-            tab1, tab2, tab3 = st.tabs(["📊 Análisis Principal", "🏗️ Análisis de Textura", "📈 Potencial de Cosecha"])
-            with tab1:
-                mostrar_resultados_principales()
-            with tab2:
-                if st.session_state.analisis_textura is not None:
-                    mostrar_resultados_textura()
+        with col1:
+            if 'indice_fertilidad' in gdf.columns:
+                fert_prom = gdf['indice_fertilidad'].mean()
+                st.metric("📊 Índice Fertilidad", f"{fert_prom:.3f}")
+                if fert_prom >= 0.7:
+                    st.success("✅ Excelente")
+                elif fert_prom >= 0.5:
+                    st.info("⚠️ Moderado")
                 else:
-                    st.info("Ejecuta el análisis principal para obtener datos de textura")
-            with tab3:
-                mostrar_potencial_cosecha()
-        else:
-            if st.session_state.analisis_tipo == "ANÁLISIS DE TEXTURA":
-                mostrar_resultados_textura()
-            else:
-                tab1, tab2 = st.tabs(["📊 Análisis Principal", "🏗️ Análisis de Textura"])
-                with tab1:
-                    mostrar_resultados_principales()
-                with tab2:
-                    if st.session_state.analisis_textura is not None:
-                        mostrar_resultados_textura()
-                    else:
-                        st.info("Ejecuta el análisis principal para obtener datos de textura")
-    elif st.session_state.gdf_original is not None:
-        mostrar_configuracion_parcela()
+                    st.warning("⚠️ Bajo")
+        
+        with col2:
+            if 'nitrogeno' in gdf.columns:
+                n_prom = gdf['nitrogeno'].mean()
+                st.metric("🌿 Nitrógeno (N)", f"{n_prom:.1f} kg/ha")
+        
+        with col3:
+            if 'fosforo' in gdf.columns:
+                p_prom = gdf['fosforo'].mean()
+                st.metric("🧪 Fósforo (P)", f"{p_prom:.1f} kg/ha")
+        
+        with col4:
+            if 'potasio' in gdf.columns:
+                k_prom = gdf['potasio'].mean()
+                st.metric("⚡ Potasio (K)", f"{k_prom:.1f} kg/ha")
+        
+        # Distribución de categorías
+        if 'categoria' in gdf.columns:
+            st.markdown("### 📈 Distribución de Categorías de Fertilidad")
+            cat_dist = gdf['categoria'].value_counts()
+            fig, ax = plt.subplots(figsize=(10, 6))
+            colors = ['#FF6B6B', '#FFD166', '#06D6A0', '#118AB2', '#073B4C']
+            ax.pie(cat_dist.values, labels=cat_dist.index, autopct='%1.1f%%', colors=colors[:len(cat_dist)])
+            ax.set_title('Distribución de Categorías de Fertilidad')
+            st.pyplot(fig)
     else:
-        mostrar_modo_demo()
+        st.info("No hay datos de fertilidad disponibles")
+    
+    st.markdown("---")
+    
+    # Sección 2: TEXTURA DEL SUELO
+    st.markdown("## 🏗️ ANÁLISIS DE TEXTURA DEL SUELO")
+    if st.session_state.analisis_textura is not None:
+        gdf_textura = st.session_state.analisis_textura
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            textura_pred = gdf_textura['textura_suelo'].mode()[0] if len(gdf_textura) > 0 else "N/A"
+            st.metric("🏗️ Textura Predominante", textura_pred)
+        
+        with col2:
+            if 'adecuacion_textura' in gdf_textura.columns:
+                adec_prom = gdf_textura['adecuacion_textura'].mean()
+                st.metric("📊 Adecuación", f"{adec_prom:.1%}")
+                if adec_prom >= 0.8:
+                    st.success("✅ Óptima")
+                elif adec_prom >= 0.6:
+                    st.info("⚠️ Adecuada")
+                else:
+                    st.warning("⚠️ Limitante")
+        
+        with col3:
+            if 'arena' in gdf_textura.columns:
+                arena_prom = gdf_textura['arena'].mean()
+                st.metric("🏖️ Arena", f"{arena_prom:.1f}%")
+        
+        with col4:
+            if 'arcilla' in gdf_textura.columns:
+                arcilla_prom = gdf_textura['arcilla'].mean()
+                st.metric("🧱 Arcilla", f"{arcilla_prom:.1f}%")
+        
+        # Gráfico de composición
+        st.markdown("### 🔺 Composición Granulométrica Promedio")
+        fig, ax = plt.subplots(figsize=(8, 8))
+        composicion = [gdf_textura['arena'].mean(), gdf_textura['limo'].mean(), gdf_textura['arcilla'].mean()]
+        labels = ['Arena', 'Limo', 'Arcilla']
+        colors = ['#d8b365', '#f6e8c3', '#01665e']
+        ax.pie(composicion, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+        ax.set_title('Composición Promedio del Suelo')
+        st.pyplot(fig)
+    else:
+        st.info("No hay datos de textura disponibles")
+    
+    st.markdown("---")
+    
+    # Sección 3: POTENCIAL DE COSECHA (solo para palma)
+    if st.session_state.cultivo == "PALMA_ACEITERA" and st.session_state.gdf_analisis is not None:
+        if 'potencial_cosecha' in st.session_state.gdf_analisis.columns:
+            st.markdown("## 🌴 POTENCIAL DE COSECHA")
+            gdf = st.session_state.gdf_analisis
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                potencial_prom = gdf['potencial_cosecha'].mean()
+                st.metric("📦 Potencial Promedio", f"{potencial_prom:.1f} ton/ha/año")
+                if potencial_prom >= 20:
+                    st.success("✅ Alto")
+                elif potencial_prom >= 15:
+                    st.info("⚠️ Moderado")
+                else:
+                    st.warning("⚠️ Bajo")
+            
+            with col2:
+                if 'radiacion_solar' in gdf.columns:
+                    rad_prom = gdf['radiacion_solar'].mean()
+                    st.metric("☀️ Radiación Solar", f"{rad_prom:.1f} MJ/m²/día")
+            
+            with col3:
+                if 'precipitacion' in gdf.columns:
+                    precip_prom = gdf['precipitacion'].mean() * 30
+                    st.metric("🌧️ Precipitación Mensual", f"{precip_prom:.0f} mm")
+            
+            with col4:
+                if 'ndvi_planetscope' in gdf.columns:
+                    ndvi_prom = gdf['ndvi_planetscope'].mean()
+                    st.metric("🛰️ NDVI (PlanetScope)", f"{ndvi_prom:.2f}")
+            
+            # Gráfico de distribución del potencial
+            st.markdown("### 📊 Distribución del Potencial de Cosecha")
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.hist(gdf['potencial_cosecha'], bins=15, color='#2ca02c', alpha=0.7, edgecolor='black')
+            ax.axvline(potencial_prom, color='red', linestyle='--', linewidth=2, label=f'Promedio: {potencial_prom:.1f} ton/ha/año')
+            ax.set_xlabel('Potencial de Cosecha (ton/ha/año)')
+            ax.set_ylabel('Frecuencia')
+            ax.set_title('Distribución del Potencial de Cosecha')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+    
+    st.markdown("---")
+    
+    # Sección 4: RECOMENDACIONES INTEGRADAS
+    st.markdown("## 🎯 RECOMENDACIONES INTEGRADAS")
+    
+    # Obtener datos para recomendaciones
+    categoria_promedio = ""
+    if st.session_state.gdf_analisis is not None and 'categoria' in st.session_state.gdf_analisis.columns:
+        categoria_promedio = st.session_state.gdf_analisis['categoria'].mode()[0] if len(st.session_state.gdf_analisis) > 0 else "MEDIA"
+    
+    textura_data = None
+    if st.session_state.analisis_textura is not None:
+        textura_predominante = st.session_state.analisis_textura['textura_suelo'].mode()[0] if len(st.session_state.analisis_textura) > 0 else "Franco"
+        adecuacion_promedio = st.session_state.analisis_textura['adecuacion_textura'].mean()
+        textura_data = {
+            'textura_predominante': textura_predominante,
+            'adecuacion_promedio': adecuacion_promedio
+        }
+    
+    # Mostrar recomendaciones
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🚜 PRIORIDADES DE MANEJO")
+        if categoria_promedio in ["MUY BAJA", "BAJA"]:
+            st.error("**URGENTE:** Mejora integral de fertilidad")
+            st.markdown("""
+            - Fertilización intensiva con NPK
+            - Aplicación de materia orgánica
+            - Control de malezas prioritario
+            """)
+        elif categoria_promedio == "MEDIA":
+            st.warning("**MODERADO:** Mantenimiento y mejora")
+            st.markdown("""
+            - Fertilización balanceada
+            - Monitoreo periódico
+            - Prácticas conservacionistas
+            """)
+        else:
+            st.success("**BAJO:** Conservación y optimización")
+            st.markdown("""
+            - Fertilización de mantenimiento
+            - Monitoreo continuo
+            - Documentación de prácticas
+            """)
+    
+    with col2:
+        st.markdown("### 🏗️ MANEJO DE SUELO")
+        if textura_data:
+            textura = textura_data.get('textura_predominante', 'Franco')
+            adecuacion = textura_data.get('adecuacion_promedio', 0.5)
+            
+            if adecuacion >= 0.8:
+                st.success("**Textura adecuada** - Prácticas conservacionistas")
+                st.markdown("""
+                - Laboreo mínimo
+                - Rotación de cultivos
+                - Coberturas vegetales
+                """)
+            elif adecuacion >= 0.6:
+                st.warning("**Textura aceptable** - Ajustes menores")
+                st.markdown("""
+                - Enmiendas orgánicas
+                - Riego optimizado
+                - Control de erosión
+                """)
+            else:
+                st.error("**Textura limitante** - Correcciones necesarias")
+                st.markdown("""
+                - Enmiendas minerales
+                - Drenaje mejorado
+                - Estructuración del suelo
+                """)
+    
+    # Sección 5: PLAN DE ACCIÓN
+    st.markdown("## 📅 PLAN DE ACCIÓN SUGERIDO")
+    
+    tab1, tab2, tab3 = st.tabs(["INMEDIATO (0-15 días)", "CORTO PLAZO (1-3 meses)", "MEDIANO PLAZO (3-12 meses)"])
+    
+    with tab1:
+        st.markdown("""
+        ### 🚀 Acciones Inmediatas
+        1. **Preparación del terreno**
+           - Laboreo según textura
+           - Nivelación si es necesario
+        2. **Fertilización inicial**
+           - Aplicación según recomendaciones NPK
+           - Incorporación de materia orgánica
+        3. **Control inicial**
+           - Eliminación de malezas
+           - Preparación de infraestructura
+        """)
+    
+    with tab2:
+        st.markdown("""
+        ### 📈 Acciones a Corto Plazo
+        1. **Establecimiento coberturas**
+           - Siembra de leguminosas
+           - Control de malezas
+        2. **Monitoreo inicial**
+           - Evaluación de germinación
+           - Ajustes de riego
+        3. **Aplicación de biofertilizantes**
+           - Compost y bocashi
+           - Tés de compost
+        """)
+    
+    with tab3:
+        st.markdown("""
+        ### 🎯 Acciones a Mediano Plazo
+        1. **Evaluación de resultados**
+           - Análisis de crecimiento
+           - Monitoreo de nutrientes
+        2. **Diversificación**
+           - Asociación de cultivos
+           - Sistemas agroforestales
+        3. **Optimización del sistema**
+           - Ajustes de manejo
+           - Planificación de cosechas
+        """)
+    
+    st.markdown("---")
+    
+    # Sección 6: DESCARGAS DEL DASHBOARD
+    st.markdown("## 💾 DESCARGAS DEL DASHBOARD")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("### 📊 Datos de Fertilidad")
+        if st.session_state.gdf_analisis is not None:
+            # Crear CSV simplificado
+            columnas_dash = ['id_zona', 'area_ha', 'indice_fertilidad', 'categoria', 'nitrogeno', 'fosforo', 'potasio']
+            columnas_dash = [col for col in columnas_dash if col in st.session_state.gdf_analisis.columns]
+            
+            if columnas_dash:
+                df_dash = st.session_state.gdf_analisis[columnas_dash].copy()
+                for col in df_dash.columns:
+                    if df_dash[col].dtype in [np.float64, np.float32]:
+                        df_dash[col] = df_dash[col].round(3)
+                
+                csv_dash = df_dash.to_csv(index=False)
+                st.download_button(
+                    label="📥 Descargar CSV Fertilidad",
+                    data=csv_dash,
+                    file_name=f"dashboard_fertilidad_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    key="dash_csv_fert"
+                )
+    
+    with col2:
+        st.markdown("### 🏗️ Datos de Textura")
+        if st.session_state.analisis_textura is not None:
+            columnas_text = ['id_zona', 'area_ha', 'textura_suelo', 'adecuacion_textura', 'arena', 'limo', 'arcilla']
+            columnas_text = [col for col in columnas_text if col in st.session_state.analisis_textura.columns]
+            
+            if columnas_text:
+                df_text = st.session_state.analisis_textura[columnas_text].copy()
+                for col in df_text.columns:
+                    if df_text[col].dtype in [np.float64, np.float32]:
+                        df_text[col] = df_text[col].round(3)
+                
+                csv_text = df_text.to_csv(index=False)
+                st.download_button(
+                    label="📥 Descargar CSV Textura",
+                    data=csv_text,
+                    file_name=f"dashboard_textura_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    key="dash_csv_text"
+                )
+    
+    with col3:
+        st.markdown("### 📋 Informe Resumen")
+        st.info("Genera un informe PDF con el resumen ejecutivo del dashboard")
+        if st.button("🔄 Generar Informe Dashboard", key="pdf_dashboard"):
+            with st.spinner("Generando informe del dashboard..."):
+                # Generar informe simplificado
+                from reportlab.lib.pagesizes import letter
+                from reportlab.pdfgen import canvas
+                from reportlab.lib.units import inch
+                
+                buffer = io.BytesIO()
+                c = canvas.Canvas(buffer, pagesize=letter)
+                width, height = letter
+                
+                # Título
+                c.setFont("Helvetica-Bold", 16)
+                c.drawString(1*inch, height - 1*inch, "INFORME DASHBOARD - RESUMEN DE ANÁLISIS")
+                
+                # Información general
+                c.setFont("Helvetica", 12)
+                c.drawString(1*inch, height - 1.5*inch, f"Cultivo: {st.session_state.cultivo}")
+                c.drawString(1*inch, height - 1.75*inch, f"Área Total: {st.session_state.area_total:.2f} ha")
+                c.drawString(1*inch, height - 2*inch, f"Mes de Análisis: {st.session_state.mes_analisis}")
+                c.drawString(1*inch, height - 2.25*inch, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+                
+                c.showPage()
+                c.save()
+                buffer.seek(0)
+                
+                st.download_button(
+                    label="📥 Descargar PDF Dashboard",
+                    data=buffer,
+                    file_name=f"dashboard_resumen_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf",
+                    key="dash_pdf"
+                )
+
+# ============================================================================
+# INTERFAZ PRINCIPAL - STREAMLIT APP
+# ============================================================================
+
+def main():
+    # Inicializar variables de sesión
+    if 'analisis_completado' not in st.session_state:
+        st.session_state.analisis_completado = False
+    if 'gdf_analisis' not in st.session_state:
+        st.session_state.gdf_analisis = None
+    if 'analisis_textura' not in st.session_state:
+        st.session_state.analisis_textura = None
+    if 'area_total' not in st.session_state:
+        st.session_state.area_total = 0.0
+    if 'cultivo' not in st.session_state:
+        st.session_state.cultivo = "PALMA_ACEITERA"
+    if 'analisis_tipo' not in st.session_state:
+        st.session_state.analisis_tipo = "FERTILIDAD ACTUAL"
+    if 'nutriente' not in st.session_state:
+        st.session_state.nutriente = "NITRÓGENO"
+    if 'mes_analisis' not in st.session_state:
+        st.session_state.mes_analisis = "ENERO"
+    
+    # Barra lateral para configuración
+    with st.sidebar:
+        st.markdown("## ⚙️ CONFIGURACIÓN")
+        
+        # Selector de cultivo
+        cultivo = st.selectbox(
+            "Selecciona el cultivo:",
+            list(PARAMETROS_CULTIVOS.keys()),
+            format_func=lambda x: x.replace('_', ' ').title(),
+            key="cultivo_select"
+        )
+        
+        # Selector de mes
+        mes_analisis = st.selectbox(
+            "Selecciona el mes de análisis:",
+            list(FACTORES_MES.keys()),
+            key="mes_select"
+        )
+        
+        # Selector de tipo de análisis
+        analisis_tipo = st.selectbox(
+            "Selecciona el tipo de análisis:",
+            ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK", "ANÁLISIS DE TEXTURA", "POTENCIAL DE COSECHA", "DASHBOARD COMPLETO"],
+            key="analisis_tipo_select"
+        )
+        
+        # Selector de nutriente si es recomendación NPK
+        nutriente = None
+        if analisis_tipo == "RECOMENDACIONES NPK":
+            nutriente = st.selectbox(
+                "Selecciona el nutriente a analizar:",
+                ["NITRÓGENO", "FÓSFORO", "POTASIO"],
+                key="nutriente_select"
+            )
+        
+        # Selector de número de zonas
+        n_zonas = st.slider(
+            "Número de zonas para análisis:",
+            min_value=4,
+            max_value=50,
+            value=16,
+            step=4,
+            help="Divide la parcela en esta cantidad de zonas para análisis detallado"
+        )
+        
+        # Carga de archivos
+        st.markdown("## 📁 CARGA DE DATOS")
+        uploaded_file = st.file_uploader(
+            "Sube tu archivo de parcela (KML, KMZ, SHP en ZIP):",
+            type=['kml', 'kmz', 'zip'],
+            help="Formatos aceptados: KML, KMZ, o Shapefile comprimido en ZIP"
+        )
+        
+        # Visualizador de parcela
+        if uploaded_file:
+            gdf_cargado = procesar_archivo(uploaded_file)
+            if gdf_cargado is not None:
+                st.success(f"✅ Archivo cargado correctamente. {len(gdf_cargado)} polígono(s) encontrado(s).")
+                
+                # Calcular área total
+                area_total = calcular_superficie(gdf_cargado)
+                st.info(f"Área total de la parcela: **{area_total:.2f} ha**")
+                
+                # Mostrar mapa de la parcela
+                st.markdown("### 🗺️ Visualización de Parcela")
+                mapa_parcela = crear_mapa_visualizador_parcela(gdf_cargado)
+                st_folium(mapa_parcela, width=300, height=300)
+                
+                # Botón para ejecutar análisis
+                st.markdown("## 🚀 EJECUTAR ANÁLISIS")
+                if st.button("🔍 Ejecutar Análisis", type="primary", use_container_width=True):
+                    with st.spinner("🔄 Procesando análisis..."):
+                        try:
+                            # Dividir parcela en zonas
+                            gdf_zonas = dividir_parcela_en_zonas(gdf_cargado, n_zonas)
+                            
+                            # Realizar análisis según tipo seleccionado
+                            if analisis_tipo == "ANÁLISIS DE TEXTURA":
+                                # Análisis de textura
+                                gdf_textura = analizar_textura_suelo(gdf_zonas, cultivo, mes_analisis)
+                                st.session_state.analisis_textura = gdf_textura
+                                st.session_state.gdf_analisis = None
+                            else:
+                                # Análisis principal (fertilidad o recomendaciones)
+                                gdf_analisis = calcular_indices_gee(gdf_zonas, cultivo, mes_analisis, analisis_tipo, nutriente)
+                                
+                                # Si es palma aceitera, calcular potencial de cosecha
+                                if cultivo == "PALMA_ACEITERA" and analisis_tipo in ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK"]:
+                                    # Obtener datos climáticos
+                                    centroid = gdf_analisis.geometry.centroid.iloc[0]
+                                    datos_clima = obtener_datos_nasa_power(centroid.y, centroid.x, mes_analisis)
+                                    datos_planetscope = obtener_datos_planetscope(centroid.y, centroid.x)
+                                    
+                                    # Calcular potencial de cosecha
+                                    gdf_analisis = calcular_potencial_cosecha(
+                                        gdf_analisis, datos_clima, datos_planetscope, cultivo
+                                    )
+                                    
+                                    # Guardar datos climáticos en sesión
+                                    st.session_state.datos_clima = datos_clima
+                                    st.session_state.datos_planetscope = datos_planetscope
+                                
+                                st.session_state.gdf_analisis = gdf_analisis
+                                st.session_state.analisis_textura = None
+                            
+                            # Guardar variables en sesión
+                            st.session_state.area_total = area_total
+                            st.session_state.cultivo = cultivo
+                            st.session_state.analisis_tipo = analisis_tipo
+                            st.session_state.nutriente = nutriente if nutriente else "NITRÓGENO"
+                            st.session_state.mes_analisis = mes_analisis
+                            st.session_state.analisis_completado = True
+                            
+                            st.success("✅ Análisis completado exitosamente!")
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error durante el análisis: {str(e)}")
+                            st.exception(e)
+        
+        # Información de la aplicación
+        st.markdown("---")
+        with st.expander("ℹ️ Acerca de esta aplicación"):
+            st.markdown("""
+            **🌱 ANALIZADOR CULTIVOS - DIGITAL TWIN**
+            
+            Esta aplicación integra:
+            - **NASA POWER API**: Datos climáticos en tiempo real
+            - **PlanetScope**: Imágenes satelitales de alta resolución
+            - **Análisis de suelo**: Fertilidad, textura y recomendaciones NPK
+            - **Agroecología**: Prácticas sostenibles y regenerativas
+            
+            **Desarrollado por:** Equipo de Agricultura Digital
+            **Versión:** 2.0.0
+            **Última actualización:** Diciembre 2024
+            """)
+    
+    # Contenido principal basado en el estado del análisis
+    if st.session_state.analisis_completado:
+        # Mostrar resultados según el tipo de análisis
+        if analisis_tipo == "ANÁLISIS DE TEXTURA":
+            mostrar_resultados_textura()
+        elif analisis_tipo == "POTENCIAL DE COSECHA":
+            mostrar_potencial_cosecha()
+        elif analisis_tipo == "DASHBOARD COMPLETO":
+            mostrar_dashboard_completo()
+        else:
+            mostrar_resultados_principales()
+    else:
+        # Pantalla de bienvenida
+        st.markdown("""
+        ## 👋 ¡Bienvenido al Analizador de Cultivos!
+        
+        Esta herramienta te permite analizar la fertilidad del suelo, textura, 
+        necesidades de nutrientes y potencial de cosecha para diferentes cultivos.
+        
+        ### 🚀 **Cómo empezar:**
+        1. **Configuración** (barra lateral):
+           - Selecciona el cultivo a analizar
+           - Elige el mes de análisis
+           - Selecciona el tipo de análisis deseado
+           - Sube tu archivo de parcela (KML/KMZ/ZIP)
+        
+        2. **Visualización**:
+           - Revisa el área total de tu parcela
+           - Visualiza la parcela en el mapa
+        
+        3. **Análisis**:
+           - Ejecuta el análisis con el botón correspondiente
+           - Explora los resultados detallados
+           - Descarga informes y datos
+        
+        ### 📊 **Tipos de análisis disponibles:**
+        - **🌿 Fertilidad Actual**: Estado actual de NPK, materia orgánica y NDVI
+        - **🧪 Recomendaciones NPK**: Dosis específicas por nutriente
+        - **🏗️ Análisis de Textura**: Composición y propiedades físicas del suelo
+        - **🌴 Potencial de Cosecha**: Estimación de rendimiento (solo palma aceitera)
+        - **📊 Dashboard Completo**: Resumen ejecutivo de todos los análisis
+        
+        ### 💡 **Consejos:**
+        - Para mejores resultados, usa archivos KML/KMZ con límites precisos
+        - El análisis de textura proporciona recomendaciones específicas de manejo
+        - El potencial de cosecha integra datos climáticos y satelitales
+        - Todos los resultados son exportables en múltiples formatos
+        """)
+        
+        # Ejemplo de interfaz
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("🌡️ Temperatura Promedio", "24°C")
+        with col2:
+            st.metric("💧 Precipitación Anual", "1800 mm")
+        with col3:
+            st.metric("☀️ Radiación Solar", "16 MJ/m²/día")
+        
+        # Espacio para información adicional
+        st.markdown("---")
+        st.markdown("""
+        ### 🔧 **Requisitos técnicos:**
+        - **Formato de archivo**: KML, KMZ o Shapefile (comprimido en ZIP)
+        - **Sistema de coordenadas**: WGS84 (EPSG:4326) recomendado
+        - **Tamaño máximo**: 10 MB por archivo
+        - **Navegador**: Chrome, Firefox o Edge actualizado
+        
+        ### 🆘 **Soporte y ayuda:**
+        Si encuentras problemas o tienes preguntas:
+        - Consulta la documentación técnica
+        - Revisa los ejemplos proporcionados
+        - Contacta al equipo de soporte técnico
+        
+        **¡Comienza subiendo tu archivo en la barra lateral!** 👈
+        """)
 
 if __name__ == "__main__":
     main()
