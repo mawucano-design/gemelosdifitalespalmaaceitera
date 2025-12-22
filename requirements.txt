@@ -8,4 +8,4 @@ streamlit-folium
 reportlab
 fiona
 requests
-plotly  # ✅ esta es la que falta
+plotly
