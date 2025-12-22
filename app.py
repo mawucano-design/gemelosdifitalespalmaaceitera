@@ -1034,7 +1034,7 @@ def crear_mapa_heatmap_potencial_cosecha(gdf):
     # Preparar datos para el heatmap
     heat_data = []
     
-    # Para cada zona, generar múltiples puntos ponderados por el potencial de cosecha
+    # Para cada zona, generar puntos basados en el potencial de cosecha
     for idx, row in gdf.iterrows():
         if row.geometry is None:
             continue
@@ -1046,39 +1046,46 @@ def crear_mapa_heatmap_potencial_cosecha(gdf):
         if potencial <= 0:
             continue
         
-        # Generar puntos dentro del polígono basado en el potencial
-        # Más puntos para mayor potencial
-        num_puntos = max(5, min(20, int(potencial * 2)))
+        # Obtener el centroide de la zona
+        try:
+            centroide = row.geometry.centroid
+        except:
+            continue
+            
+        # Calcular el peso normalizado (0-1) basado en el potencial
+        # Suponiendo que el potencial máximo es 30 ton/ha/año
+        peso_normalizado = min(1.0, max(0.1, potencial / 30.0))
         
-        # Obtener los límites del polígono
+        # Agregar múltiples puntos alrededor del centroide para crear efecto de densidad
+        # Cuanto mayor el potencial, más puntos
+        num_puntos = int(peso_normalizado * 10) + 1
+        
+        # Obtener bounds del polígono para dispersar puntos
         bounds = row.geometry.bounds
         minx, miny, maxx, maxy = bounds
+        diff_x = maxx - minx
+        diff_y = maxy - miny
         
-        # Generar puntos aleatorios dentro del polígono
-        puntos_generados = 0
-        intentos = 0
-        max_intentos = num_puntos * 10
-        
-        while puntos_generados < num_puntos and intentos < max_intentos:
-            intentos += 1
+        for _ in range(num_puntos):
+            # Generar puntos ligeramente desplazados del centroide
+            offset_x = np.random.uniform(-diff_x * 0.2, diff_x * 0.2)
+            offset_y = np.random.uniform(-diff_y * 0.2, diff_y * 0.2)
             
-            # Generar un punto aleatorio dentro del bounding box
-            random_x = np.random.uniform(minx, maxx)
-            random_y = np.random.uniform(miny, maxy)
-            random_point = Point(random_x, random_y)
+            lat = centroide.y + offset_y
+            lon = centroide.x + offset_x
             
-            # Verificar si el punto está dentro del polígono
-            if row.geometry.contains(random_point):
-                # El peso se normaliza entre 0 y 1 basado en el potencial
-                # Suponiendo que el potencial máximo es 30 ton/ha/año
-                peso_normalizado = min(1.0, potencial / 30.0)
-                
-                # Añadir el punto al heatmap
-                heat_data.append([random_y, random_x, peso_normalizado])
-                puntos_generados += 1
+            # Verificar que el punto esté dentro del polígono (aproximación)
+            # Para simplificar, asumimos que los puntos desplazados están dentro
+            heat_data.append([lat, lon, peso_normalizado])
     
     # Si hay datos para el heatmap, agregarlo
     if heat_data:
+        # Limitar el número de puntos para mejorar rendimiento
+        if len(heat_data) > 500:
+            # Muestrear puntos si hay demasiados
+            indices = np.random.choice(len(heat_data), 500, replace=False)
+            heat_data = [heat_data[i] for i in indices]
+        
         # Crear el heatmap
         plugins.HeatMap(
             heat_data,
@@ -1123,7 +1130,7 @@ def crear_mapa_heatmap_potencial_cosecha(gdf):
                 'fillColor': color,
                 'color': 'black',
                 'weight': 1,
-                'fillOpacity': 0.2,  # Muy transparente para no tapar el heatmap
+                'fillOpacity': 0.2,
                 'opacity': 0.5
             },
             popup=folium.Popup(popup_text, max_width=300)
@@ -1159,57 +1166,41 @@ def crear_mapa_densidad_puntos(gdf):
         overlay=False
     ).add_to(m)
     
-    # Preparar datos para densidad
-    density_data = []
-    
+    # Para cada zona, agregar un marcador en el centroide
     for idx, row in gdf.iterrows():
         if row.geometry is None:
             continue
             
         potencial = row.get('potencial_cosecha', 0)
         
-        # Generar puntos proporcionales al potencial
-        num_puntos = max(3, min(15, int(potencial)))
+        # Obtener centroide
+        try:
+            centroide = row.geometry.centroid
+        except:
+            continue
         
-        bounds = row.geometry.bounds
-        minx, miny, maxx, maxy = bounds
+        # Color basado en el potencial
+        if potencial < 10:
+            color = 'gray'
+        elif potencial < 15:
+            color = 'yellow'
+        elif potencial < 20:
+            color = 'orange'
+        else:
+            color = 'red'
         
-        puntos_generados = 0
-        intentos = 0
-        max_intentos = num_puntos * 10
+        # Tamaño del marcador basado en el potencial
+        size = max(3, min(10, int(potencial / 3)))
         
-        while puntos_generados < num_puntos and intentos < max_intentos:
-            intentos += 1
-            
-            random_x = np.random.uniform(minx, maxx)
-            random_y = np.random.uniform(miny, maxy)
-            random_point = Point(random_x, random_y)
-            
-            if row.geometry.contains(random_point):
-                # Color basado en el potencial
-                if potencial < 10:
-                    color = 'gray'
-                elif potencial < 15:
-                    color = 'yellow'
-                elif potencial < 20:
-                    color = 'orange'
-                else:
-                    color = 'red'
-                
-                # Tamaño del marcador basado en el potencial
-                size = max(3, min(10, int(potencial / 3)))
-                
-                folium.CircleMarker(
-                    location=[random_y, random_x],
-                    radius=size,
-                    color=color,
-                    fill=True,
-                    fillColor=color,
-                    fillOpacity=0.7,
-                    popup=f"Potencial: {potencial:.1f} ton/ha/año"
-                ).add_to(m)
-                
-                puntos_generados += 1
+        folium.CircleMarker(
+            location=[centroide.y, centroide.x],
+            radius=size,
+            color=color,
+            fill=True,
+            fillColor=color,
+            fillOpacity=0.7,
+            popup=f"Potencial: {potencial:.1f} ton/ha/año"
+        ).add_to(m)
     
     # Agregar los polígonos originales (transparentes)
     for idx, row in gdf.iterrows():
