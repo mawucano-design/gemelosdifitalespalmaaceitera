@@ -17,7 +17,7 @@ from folium import plugins
 from streamlit_folium import st_folium
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlit.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
@@ -26,6 +26,7 @@ import base64
 import fiona
 import requests
 import warnings
+# === DEPENDENCIAS PARA INTERFAZ MODERNA ===
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -423,36 +424,17 @@ def evaluar_adecuacion_textura(textura_actual, cultivo):
 # NUEVA FUNCIÓN: DATOS SATELITALES REALISTAS (Sentinel-2 + PlanetScope)
 # ============================================================================
 def obtener_datos_satelitales(lat, lon, fecha_analisis, cultivo):
-    """
-    Simula datos realistas de Sentinel-2 y PlanetScope basados en coordenadas, fecha y cultivo.
-    """
     seed = abs(hash(f"{lat:.4f}_{lon:.4f}_{fecha_analisis}_{cultivo}")) % (2**32)
     rng = np.random.RandomState(seed)
-    
-    # Valores base por cultivo
-    base_ndvi = {
-        'PALMA_ACEITERA': 0.65,
-        'CACAO': 0.55,
-        'BANANO': 0.70
-    }.get(cultivo, 0.6)
-    
+    base_ndvi = {'PALMA_ACEITERA': 0.65, 'CACAO': 0.55, 'BANANO': 0.70}.get(cultivo, 0.6)
     base_evi = base_ndvi * 0.8
-    base_lai = {
-        'PALMA_ACEITERA': 4.0,
-        'CACAO': 3.0,
-        'BANANO': 5.0
-    }.get(cultivo, 4.0)
-    
-    # Variabilidad estacional
+    base_lai = {'PALMA_ACEITERA': 4.0, 'CACAO': 3.0, 'BANANO': 5.0}.get(cultivo, 4.0)
     mes = fecha_analisis.month
     estacional = 1.0 + 0.3 * np.sin(2 * np.pi * (mes - 1) / 12)
-    
-    # Simular datos realistas
     ndvi = np.clip(rng.normal(base_ndvi * estacional, 0.08), 0.2, 0.9)
     evi = np.clip(rng.normal(base_evi * estacional, 0.07), 0.15, 0.8)
     lai = np.clip(rng.normal(base_lai * estacional, 0.6), 1.0, 8.0)
-    savi = np.clip(ndvi * (1 + 0.5) / (1 + ndvi + 0.5), 0.1, 0.85)  # Ajustado para suelo
-    
+    savi = np.clip(ndvi * (1 + 0.5) / (1 + ndvi + 0.5), 0.1, 0.85)
     return {
         'ndvi': ndvi,
         'evi': evi,
@@ -465,7 +447,6 @@ def obtener_datos_satelitales(lat, lon, fecha_analisis, cultivo):
 # FUNCIONES DE DATOS CLIMÁTICOS Y PLANETSCOPE
 # ============================================================================
 def obtener_datos_nasa_power(lat, lon, mes_analisis):
-    """Obtiene datos climáticos de NASA POWER"""
     try:
         mes_num = {
             "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5, "JUNIO": 6,
@@ -507,7 +488,6 @@ def obtener_datos_nasa_power(lat, lon, mes_analisis):
         }
 
 def calcular_potencial_cosecha(gdf_analisis, datos_clima, datos_satelitales, cultivo):
-    """Calcula potencial de cosecha usando suelo + clima + satélite"""
     if cultivo != "PALMA_ACEITERA":
         gdf_analisis['potencial_cosecha'] = 0.0
         return gdf_analisis
@@ -707,11 +687,10 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente, n
             humedad = max(0.1, min(0.8, rng.normal(params['HUMEDAD_OPTIMA'], 0.1)))
             ph = max(4.0, min(8.0, rng.normal(params['pH_OPTIMO'], 0.5)))
             conductividad = max(0.1, min(3.0, rng.normal(params['CONDUCTIVIDAD_OPTIMA'], 0.3)))
-            # ✅ Usar datos satelitales reales si están disponibles
             if ndvi_base is not None:
                 ndvi = np.clip(rng.normal(ndvi_base, 0.05), 0.1, 0.95)
             elif evi_base is not None:
-                base_ndvi = evi_base / 0.8  # Aproximación inversa
+                base_ndvi = evi_base / 0.8
                 ndvi = np.clip(rng.normal(base_ndvi, 0.05), 0.1, 0.95)
             else:
                 base_ndvi = 0.3 + 0.5 * variabilidad_local
@@ -1585,16 +1564,24 @@ def mostrar_recomendaciones_agroecologicas(cultivo, categoria, area_ha, analisis
 # FUNCIONES DE VISUALIZACIÓN DE RESULTADOS
 # ============================================================================
 def mostrar_resultados_principales():
+    # ✅ Verificación de que las claves existan en session_state
+    required_keys = ['gdf_analisis', 'area_total', 'cultivo', 'analisis_tipo', 'nutriente', 'mes_analisis']
+    if not all(k in st.session_state for k in required_keys):
+        st.error("⚠️ Error: configuración incompleta. Por favor, vuelve a la página principal y configura todos los parámetros.")
+        return
+
     gdf_analisis = st.session_state.gdf_analisis
     area_total = st.session_state.area_total
     cultivo = st.session_state.cultivo
     analisis_tipo = st.session_state.analisis_tipo
     nutriente = st.session_state.nutriente
     mes_analisis = st.session_state.mes_analisis
+
     st.markdown("## 📈 RESULTADOS DEL ANÁLISIS PRINCIPAL")
     if st.button("⬅️ Volver a Configuración", key="volver_principal"):
         st.session_state.analisis_completado = False
         st.rerun()
+    
     st.subheader("📊 Estadísticas del Análisis")
     if analisis_tipo == "FERTILIDAD ACTUAL":
         col1, col2, col3, col4 = st.columns(4)
@@ -1648,6 +1635,7 @@ def mostrar_resultados_principales():
         with col_mo:
             avg_mo = gdf_analisis['materia_organica'].mean()
             st.metric("Materia Orgánica", f"{avg_mo:.1f}%")
+    
     st.markdown("### 🗺️ Mapas de Análisis")
     if analisis_tipo == "FERTILIDAD ACTUAL":
         columna_visualizar = 'indice_fertilidad'
@@ -1655,16 +1643,19 @@ def mostrar_resultados_principales():
     else:
         columna_visualizar = 'recomendacion_npk'
         titulo_mapa = f"Recomendación {nutriente} - {cultivo.replace('_', ' ').title()}"
+    
     mapa_analisis = crear_mapa_interactivo_esri(
         gdf_analisis, titulo_mapa, columna_visualizar, analisis_tipo, nutriente
     )
     st_folium(mapa_analisis, width=800, height=500)
+    
     st.markdown("### 📄 Mapa para Reporte")
     mapa_estatico = crear_mapa_estatico(
         gdf_analisis, titulo_mapa, columna_visualizar, analisis_tipo, nutriente
     )
     if mapa_estatico:
         st.image(mapa_estatico, caption=titulo_mapa, use_column_width=True)
+    
     st.markdown("### 📋 Tabla de Resultados por Zona")
     columnas_tabla = ['id_zona', 'area_ha', 'categoria', 'prioridad']
     if analisis_tipo == "FERTILIDAD ACTUAL":
@@ -1684,10 +1675,12 @@ def mostrar_resultados_principales():
         df_tabla['recomendacion_npk'] = df_tabla['recomendacion_npk'].round(1)
         df_tabla['deficit_npk'] = df_tabla['deficit_npk'].round(1)
     st.dataframe(df_tabla, use_container_width=True)
+    
     categoria_promedio = gdf_analisis['categoria'].mode()[0] if len(gdf_analisis) > 0 else "MEDIA"
     mostrar_recomendaciones_agroecologicas(
         cultivo, categoria_promedio, area_total, analisis_tipo, nutriente
     )
+    
     st.markdown("### 💾 Descargar Resultados")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1918,7 +1911,7 @@ def mostrar_potencial_cosecha():
                             return
                         centroid = gdf.geometry.unary_union.centroid
                         m = folium.Map(location=[centroid.y, centroid.x], zoom_start=14, tiles='OpenStreetMap')
-                        folium.TileLayer(
+                        folian.TileLayer(
                             tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                             attr='Esri',
                             name='Esri Satélite'
@@ -2145,7 +2138,7 @@ def mostrar_clima_detalles():
             st.info("📄 PDF disponible en 'Generar Informe Completo'")
 
 # ============================================================================
-# INTERFAZ PRINCIPAL
+# INTERFAZ PRINCIPAL (CORREGIDA)
 # ============================================================================
 def main():
     if 'gdf_original' not in st.session_state:
@@ -2162,6 +2155,7 @@ def main():
         st.session_state.datos_clima = {}
     if 'datos_satelitales' not in st.session_state:
         st.session_state.datos_satelitales = {}
+
     uploaded_file = st.file_uploader("📤 Suba su archivo de parcela (Shapefile ZIP o KML)", type=["zip", "kml"])
     if uploaded_file is not None:
         with st.spinner("🔄 Procesando archivo geoespacial..."):
@@ -2169,52 +2163,73 @@ def main():
             if gdf is not None:
                 st.session_state.gdf_original = gdf
                 st.success("✅ Archivo procesado exitosamente")
+
     if st.session_state.gdf_original is not None:
         st.markdown("### 🗺️ Vista previa de la parcela")
         area_total = calcular_superficie(st.session_state.gdf_original)
         st.metric("📐 Área Total", f"{area_total:.2f} ha")
         mapa_parcela = crear_mapa_visualizador_parcela(st.session_state.gdf_original)
         st_folium(mapa_parcela, width=800, height=500)
+
         st.markdown("### ⚙️ Parámetros del análisis")
         col1, col2, col3 = st.columns(3)
         with col1:
-            cultivo = st.selectbox("🌱 Seleccione el cultivo", 
-                                 ["PALMA_ACEITERA", "CACAO", "BANANO"], 
-                                 key="cultivo_select")
+            st.selectbox("🌱 Seleccione el cultivo", 
+                        ["PALMA_ACEITERA", "CACAO", "BANANO"], 
+                        key="cultivo")
         with col2:
-            mes_analisis = st.selectbox("📅 Mes de análisis", list(FACTORES_MES.keys()))
+            st.selectbox("📅 Mes de análisis", 
+                        list(FACTORES_MES.keys()),
+                        key="mes_analisis")
         with col3:
-            n_zonas = st.slider("🔢 Número de zonas para análisis", 1, 100, 16)
+            st.slider("🔢 Número de zonas para análisis", 1, 100, 16, key="n_zonas")
+
+        st.selectbox("🔍 Tipo de Análisis:", 
+                    ["FERTILIDAD ACTUAL", "RECOMENDACIONES NPK", "ANÁLISIS DE TEXTURA"],
+                    key="analisis_tipo")
+        st.selectbox("Nutriente:", 
+                    ["NITRÓGENO", "FÓSFORO", "POTASIO"],
+                    key="nutriente")
+
         if st.button("🔍 Iniciar Análisis", type="primary"):
             with st.spinner("🔬 Analizando parcela con Sentinel-2, PlanetScope y NASA POWER..."):
+                n_zonas = st.session_state.n_zonas
                 gdf_zonas = dividir_parcela_en_zonas(st.session_state.gdf_original, n_zonas)
                 gdf_zonas = gdf_zonas.reset_index(drop=True)
                 gdf_zonas['id_zona'] = range(1, len(gdf_zonas) + 1)
-                # ✅ Obtener datos satelitales realistas
+                
                 centroid_total = gdf_zonas.unary_union.centroid
-                mes_num = list(FACTORES_MES.keys()).index(mes_analisis) + 1
+                mes_num = list(FACTORES_MES.keys()).index(st.session_state.mes_analisis) + 1
                 fecha_analisis = datetime(datetime.now().year, mes_num, 15)
-                datos_satelitales = obtener_datos_satelitales(centroid_total.y, centroid_total.x, fecha_analisis, cultivo)
-                # Análisis de textura
-                gdf_textura = analizar_textura_suelo(gdf_zonas, cultivo, mes_analisis)
+                datos_satelitales = obtener_datos_satelitales(
+                    centroid_total.y, centroid_total.x, fecha_analisis, st.session_state.cultivo
+                )
+                
+                gdf_textura = analizar_textura_suelo(gdf_zonas, st.session_state.cultivo, st.session_state.mes_analisis)
                 st.session_state.analisis_textura = gdf_textura
-                # Datos climáticos
-                datos_clima = obtener_datos_nasa_power(centroid_total.y, centroid_total.x, mes_analisis)
+                
+                datos_clima = obtener_datos_nasa_power(centroid_total.y, centroid_total.x, st.session_state.mes_analisis)
                 st.session_state.datos_clima = datos_clima
                 st.session_state.datos_satelitales = datos_satelitales
-                # Análisis GEE - Fertilidad
-                gdf_fertilidad = calcular_indices_gee(gdf_zonas, cultivo, mes_analisis, "FERTILIDAD ACTUAL", "", 
-                                                    ndvi_base=datos_satelitales['ndvi'],
-                                                    evi_base=datos_satelitales['evi'])
-                # ✅ Potencial de cosecha (solo para palma)
-                if cultivo == "PALMA_ACEITERA":
-                    gdf_fertilidad = calcular_potencial_cosecha(gdf_fertilidad, datos_clima, datos_satelitales, cultivo)
+                
+                gdf_fertilidad = calcular_indices_gee(
+                    gdf_zonas, 
+                    st.session_state.cultivo, 
+                    st.session_state.mes_analisis, 
+                    st.session_state.analisis_tipo, 
+                    st.session_state.nutriente,
+                    ndvi_base=datos_satelitales['ndvi'],
+                    evi_base=datos_satelitales['evi']
+                )
+                
+                if st.session_state.cultivo == "PALMA_ACEITERA":
+                    gdf_fertilidad = calcular_potencial_cosecha(gdf_fertilidad, datos_clima, datos_satelitales, st.session_state.cultivo)
+                
                 st.session_state.gdf_analisis = gdf_fertilidad
                 st.session_state.area_total = area_total
-                st.session_state.cultivo = cultivo
-                st.session_state.mes_analisis = mes_analisis
                 st.session_state.analisis_completado = True
                 st.success("✅ Análisis completado con éxito")
+
     if st.session_state.analisis_completado:
         st.markdown("### 📊 Seleccione el tipo de análisis a visualizar")
         opcion = st.selectbox("🔍 Tipo de análisis",
