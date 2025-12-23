@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
 import io
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 import math
 import folium
 from folium import plugins
@@ -146,17 +146,16 @@ TEXTURA_SUELO_OPTIMA = {
     }
 }
 
-# === CORRECCIÓN CRÍTICA: FACTORES ESTACIONALES ===
+# FACTORES ESTACIONALES
 FACTORES_MES = {
     "ENERO": 0.9, "FEBRERO": 0.95, "MARZO": 1.0, "ABRIL": 1.05,
     "MAYO": 1.1, "JUNIO": 1.0, "JULIO": 0.95, "AGOSTO": 0.9,
     "SEPTIEMBRE": 0.95, "OCTUBRE": 1.0, "NOVIEMBRE": 1.05, "DICIEMBRE": 1.0
 }
 
-# ¡CORREGIDO! Cambiar FACTORES_K_Mes por FACTORES_K_MES
 FACTORES_N_MES = FACTORES_MES.copy()
 FACTORES_P_MES = FACTORES_MES.copy()
-FACTORES_K_MES = FACTORES_MES.copy()  # ¡ESTA ES LA CORRECCIÓN!
+FACTORES_K_MES = FACTORES_MES.copy()
 
 # PALETAS
 PALETAS_GEE = {
@@ -661,11 +660,11 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente, n
     params = PARAMETROS_CULTIVOS[cultivo]
     zonas_gdf = gdf.copy()
     
-    # ¡CORREGIDO! Usar los nombres correctos
+    # Usar los nombres correctos
     factor_mes = FACTORES_MES[mes_analisis]
     factor_n_mes = FACTORES_N_MES[mes_analisis]
     factor_p_mes = FACTORES_P_MES[mes_analisis]
-    factor_k_mes = FACTORES_K_MES[mes_analisis]  # ¡Ahora existe!
+    factor_k_mes = FACTORES_K_MES[mes_analisis]
     
     zonas_gdf['area_ha'] = 0.0
     zonas_gdf['nitrogeno'] = 0.0
@@ -836,6 +835,9 @@ def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente, n
 # FUNCIONES DE VISUALIZACIÓN
 # ============================================================================
 def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=None, nutriente=None):
+    if len(gdf) == 0:
+        return None
+    
     centroid = gdf.geometry.centroid.iloc[0]
     bounds = gdf.total_bounds
     
@@ -909,11 +911,11 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
         
         for idx, row in gdf.iterrows():
             if analisis_tipo == "ANÁLISIS DE TEXTURA":
-                textura = row[columna_valor]
+                textura = row.get(columna_valor, "NO_DETERMINADA")
                 color = colores_textura.get(textura, '#999999')
                 valor_display = textura
             else:
-                valor = row[columna_valor]
+                valor = row.get(columna_valor, 0)
                 color = obtener_color(valor, vmin, vmax, colores)
                 if analisis_tipo == "FERTILIDAD ACTUAL":
                     valor_display = f"{valor:.3f}"
@@ -949,14 +951,17 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
             ).add_to(m)
             
             # Marcador con número de zona
-            centroid = row.geometry.centroid
-            folium.Marker(
-                [centroid.y, centroid.x],
-                popup=f"Zona {row.get('id_zona', idx+1)}",
-                icon=folium.DivIcon(
-                    html=f'<div style="font-size: 10pt; font-weight: bold; color: black; background: white; border-radius: 50%; padding: 2px;">{row.get("id_zona", idx+1)}</div>'
-                )
-            ).add_to(m)
+            try:
+                centroid = row.geometry.centroid
+                folium.Marker(
+                    [centroid.y, centroid.x],
+                    popup=f"Zona {row.get('id_zona', idx+1)}",
+                    icon=folium.DivIcon(
+                        html=f'<div style="font-size: 10pt; font-weight: bold; color: black; background: white; border-radius: 50%; padding: 2px;">{row.get("id_zona", idx+1)}</div>'
+                    )
+                ).add_to(m)
+            except:
+                pass
     else:
         for idx, row in gdf.iterrows():
             area_ha = calcular_superficie(gdf.iloc[[idx]])
@@ -1003,6 +1008,9 @@ def crear_mapa_interactivo_esri(gdf, titulo, columna_valor=None, analisis_tipo=N
     return m
 
 def crear_mapa_visualizador_parcela(gdf):
+    if len(gdf) == 0:
+        return None
+    
     centroid = gdf.geometry.centroid.iloc[0]
     bounds = gdf.total_bounds
     
@@ -1071,32 +1079,40 @@ def crear_mapa_estatico(gdf, titulo, columna_valor=None, analisis_tipo=None, nut
             
             for idx, row in gdf.iterrows():
                 if analisis_tipo == "ANÁLISIS DE TEXTURA":
-                    textura = row[columna_valor]
+                    textura = row.get(columna_valor, "NO_DETERMINADA")
                     color = colores_textura.get(textura, '#999999')
+                    # Para textura, el valor a mostrar es la textura misma
+                    texto_valor = textura[:10]  # Mostrar solo primeros 10 caracteres
                 else:
-                    valor = row[columna_valor]
+                    valor = row.get(columna_valor, 0)
                     valor_norm = (valor - vmin) / (vmax - vmin)
                     valor_norm = max(0, min(1, valor_norm))
                     color = cmap(valor_norm)
+                    
+                    # Formatear según el tipo de análisis
+                    if analisis_tipo == "FERTILIDAD ACTUAL":
+                        texto_valor = f"{valor:.3f}"
+                    elif analisis_tipo == "POTENCIAL_COSECHA":
+                        texto_valor = f"{valor:.1f}"
+                    elif analisis_tipo in ["RECOMENDACIONES NPK", "CLIMÁTICO"]:
+                        texto_valor = f"{valor:.1f}"
+                    else:
+                        texto_valor = f"{valor:.0f}"
                 
                 gdf.iloc[[idx]].plot(ax=ax, color=color, edgecolor='black', linewidth=1)
-                centroid = row.geometry.centroid
-                
-                if analisis_tipo == "FERTILIDAD ACTUAL":
-                    texto_valor = f"{row[columna_valor]:.3f}"
-                elif analisis_tipo == "POTENCIAL_COSECHA":
-                    texto_valor = f"{row[columna_valor]:.1f}"
-                else:
-                    texto_valor = f"{row[columna_valor]:.0f}"
-                
-                # Anotación corregida
-                id_zona = row.get('id_zona', idx+1)
-                ax.annotate(f"Z{id_zona}\n{texto_valor}", 
-                           (centroid.x, centroid.y), 
-                           xytext=(3, 3), textcoords="offset points", 
-                           fontsize=6, color='black', weight='bold',
-                           bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8),
-                           ha='center', va='center')
+                try:
+                    centroid = row.geometry.centroid
+                    
+                    # Anotación corregida
+                    id_zona = row.get('id_zona', idx+1)
+                    ax.annotate(f"Z{id_zona}\n{texto_valor}", 
+                               (centroid.x, centroid.y), 
+                               xytext=(3, 3), textcoords="offset points", 
+                               fontsize=6, color='black', weight='bold',
+                               bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8),
+                               ha='center', va='center')
+                except:
+                    pass
         else:
             gdf.plot(ax=ax, color='lightblue', edgecolor='black', linewidth=2, alpha=0.7)
         
@@ -1271,7 +1287,7 @@ def mostrar_mapas_climaticos_historicos():
     st.plotly_chart(fig_viento, use_container_width=True)
 
 # ============================================================================
-# FUNCIONES DE RESULTADOS
+# FUNCIONES DE RESULTADOS - CORREGIDAS
 # ============================================================================
 def mostrar_resultados_principales():
     if st.session_state.gdf_analisis is not None:
@@ -1297,7 +1313,8 @@ def mostrar_resultados_principales():
             analisis_tipo="FERTILIDAD ACTUAL",
             nutriente=None
         )
-        st_folium(mapa_interactivo, width=800, height=500)
+        if mapa_interactivo:
+            st_folium(mapa_interactivo, width=800, height=500)
         
         # Mapa estático
         st.subheader("📊 Mapa Estático de Fertilidad")
@@ -1367,7 +1384,8 @@ def mostrar_resultados_textura():
             analisis_tipo="ANÁLISIS DE TEXTURA",
             nutriente=None
         )
-        st_folium(mapa_interactivo, width=800, height=500)
+        if mapa_interactivo:
+            st_folium(mapa_interactivo, width=800, height=500)
         
         # Mapa estático
         mapa_estatico = crear_mapa_estatico(
@@ -1412,7 +1430,8 @@ def mostrar_potencial_cosecha():
             analisis_tipo="POTENCIAL_COSECHA",
             nutriente=None
         )
-        st_folium(mapa_interactivo, width=800, height=500)
+        if mapa_interactivo:
+            st_folium(mapa_interactivo, width=800, height=500)
         
         # Mapa estático
         mapa_estatico = crear_mapa_estatico(
@@ -1482,21 +1501,55 @@ def mostrar_clima_detalles():
         with col4:
             st.metric("💧 Humedad Relativa", f"{datos['humedad_relativa']:.1f} %")
         
-        # Mapa climático interactivo
+        # Mapa climático interactivo - CORREGIDO
         st.subheader("🗺️ Mapa Climático Interactivo")
-        gdf_centroid = gpd.GeoDataFrame(
-            geometry=[st.session_state.gdf_original.geometry.centroid.iloc[0]],
+        
+        # Crear un GeoDataFrame con el centroide y los datos climáticos
+        centroid = st.session_state.gdf_original.geometry.centroid.iloc[0]
+        
+        # Crear un GeoDataFrame con múltiples puntos para visualizar
+        # Simulamos variabilidad espacial
+        import random
+        
+        # Crear varios puntos alrededor del centroide
+        points = []
+        precip_values = []
+        
+        for i in range(5):
+            # Pequeña variación en las coordenadas
+            lat_variation = centroid.y + random.uniform(-0.01, 0.01)
+            lon_variation = centroid.x + random.uniform(-0.01, 0.01)
+            
+            # Valor de precipitación con variación
+            precip_variation = datos['precipitacion'] * random.uniform(0.8, 1.2)
+            
+            points.append(Point(lon_variation, lat_variation))
+            precip_values.append(precip_variation)
+        
+        # Crear GeoDataFrame
+        gdf_clima = gpd.GeoDataFrame(
+            {
+                'precipitacion': precip_values,
+                'radiacion_solar': [datos['radiacion_solar']] * 5,
+                'velocidad_viento': [datos['velocidad_viento']] * 5,
+                'humedad_relativa': [datos['humedad_relativa']] * 5
+            },
+            geometry=points,
             crs=st.session_state.gdf_original.crs
         )
         
+        # Añadir id_zona
+        gdf_clima['id_zona'] = range(1, len(gdf_clima) + 1)
+        
         mapa_clima = crear_mapa_interactivo_esri(
-            gdf_centroid,
+            gdf_clima,
             "CLIMÁTICO",
             columna_valor='precipitacion',
             analisis_tipo="CLIMÁTICO",
             nutriente="PRECIP"
         )
-        st_folium(mapa_clima, width=800, height=500)
+        if mapa_clima:
+            st_folium(mapa_clima, width=800, height=500)
         
         # Gráficos de barras
         st.subheader("📊 Gráficos de Datos Climáticos")
@@ -1586,7 +1639,8 @@ def main():
         st.metric("📐 Área Total", f"{area_total:.2f} ha")
         
         mapa_parcela = crear_mapa_visualizador_parcela(st.session_state.gdf_original)
-        st_folium(mapa_parcela, width=800, height=500)
+        if mapa_parcela:
+            st_folium(mapa_parcela, width=800, height=500)
         
         st.markdown("### ⚙️ Parámetros del análisis")
         col1, col2, col3 = st.columns(3)
