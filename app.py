@@ -146,16 +146,17 @@ TEXTURA_SUELO_OPTIMA = {
     }
 }
 
-# FACTORES ESTACIONALES
+# === CORRECCIÓN CRÍTICA: FACTORES ESTACIONALES ===
 FACTORES_MES = {
     "ENERO": 0.9, "FEBRERO": 0.95, "MARZO": 1.0, "ABRIL": 1.05,
     "MAYO": 1.1, "JUNIO": 1.0, "JULIO": 0.95, "AGOSTO": 0.9,
     "SEPTIEMBRE": 0.95, "OCTUBRE": 1.0, "NOVIEMBRE": 1.05, "DICIEMBRE": 1.0
 }
 
+# ¡CORREGIDO! Cambiar FACTORES_K_Mes por FACTORES_K_MES
 FACTORES_N_MES = FACTORES_MES.copy()
 FACTORES_P_MES = FACTORES_MES.copy()
-FACTORES_K_Mes = FACTORES_MES.copy()
+FACTORES_K_MES = FACTORES_MES.copy()  # ¡ESTA ES LA CORRECCIÓN!
 
 # PALETAS
 PALETAS_GEE = {
@@ -442,7 +443,7 @@ def obtener_datos_nasa_power_historicos(lat, lon, years=10):
                 except:
                     continue
         
-        # Promediar por mes - CORREGIDO
+        # Promediar por mes
         for key in all_data:
             if len(all_data[key]) >= 12:
                 arr = np.array(all_data[key])
@@ -659,10 +660,12 @@ def dividir_parcela_en_zonas(gdf, n_zonas):
 def calcular_indices_gee(gdf, cultivo, mes_analisis, analisis_tipo, nutriente, ndvi_base=None, evi_base=None):
     params = PARAMETROS_CULTIVOS[cultivo]
     zonas_gdf = gdf.copy()
+    
+    # ¡CORREGIDO! Usar los nombres correctos
     factor_mes = FACTORES_MES[mes_analisis]
     factor_n_mes = FACTORES_N_MES[mes_analisis]
     factor_p_mes = FACTORES_P_MES[mes_analisis]
-    factor_k_mes = FACTORES_K_MES[mes_analisis]
+    factor_k_mes = FACTORES_K_MES[mes_analisis]  # ¡Ahora existe!
     
     zonas_gdf['area_ha'] = 0.0
     zonas_gdf['nitrogeno'] = 0.0
